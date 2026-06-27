@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>动量守恒 · 完全弹性碰撞 · 可调摩擦 · 无限远运动</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(145deg, #0a1620 0%, #141e2a 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Poppins', 'Microsoft YaHei', sans-serif;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(18, 30, 42, 0.8);
+            backdrop-filter: blur(8px);
+            border-radius: 2.5rem;
+            padding: 1.5rem 2rem 2rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,200,0.12);
+            max-width: 1100px;
+            width: 100%;
+        }
+        h1 {
+            text-align: center;
+            color: #fff;
+            font-weight: 500;
+            font-size: 1.7rem;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+        .sub {
+            text-align: center;
+            color: #8ab4d0;
+            font-size: 0.85rem;
+            border-bottom: 1px solid #2a4055;
+            display: inline-block;
+            margin: 0 auto 12px auto;
+            padding-bottom: 4px;
+            width: auto;
+        }
+        .main-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .canvas-wrapper {
+            flex: 2.5;
+            min-width: 400px;
+            background: #dce4ed;
+            border-radius: 28px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+            padding: 8px;
+            position: relative;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 800 / 400;
+            border-radius: 24px;
+            cursor: pointer;
+            background: #e8eef5;
+        }
+        .panel {
+            flex: 1.2;
+            min-width: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .stats-box {
+            background: #0d1a24cc;
+            backdrop-filter: blur(6px);
+            border-radius: 24px;
+            padding: 14px 18px;
+            border-left: 4px solid #ffaa55;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #d0e4f0;
+        }
+        .stats-box div {
+            margin: 3px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .stats-box .label {
+            color: #8ab4d0;
+        }
+        .stats-box .value {
+            color: #ffcc77;
+            font-weight: bold;
+        }
+        .stats-box .value.p1 { color: #66bbff; }
+        .stats-box .value.p2 { color: #ff8866; }
+        .stats-box .value.green { color: #88dd88; }
+        .controls-box {
+            background: #0d1a24cc;
+            backdrop-filter: blur(6px);
+            border-radius: 24px;
+            padding: 14px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .ctrl-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .ctrl-row label {
+            color: #b0cfe0;
+            font-size: 13px;
+            min-width: 60px;
+            font-weight: 500;
+        }
+        .ctrl-row input[type="range"] {
+            flex: 1;
+            cursor: pointer;
+            background: #2a4055;
+            height: 3px;
+            border-radius: 3px;
+            -webkit-appearance: none;
+        }
+        .ctrl-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #ffaa44;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(255,170,68,0.4);
+        }
+        .ctrl-row input[type="range"]:disabled::-webkit-slider-thumb {
+            background: #667;
+            box-shadow: none;
+        }
+        .ctrl-row span {
+            color: #ffcc77;
+            font-weight: bold;
+            min-width: 40px;
+            text-align: right;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            flex: 1;
+            padding: 10px 12px;
+            border: none;
+            border-radius: 40px;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        button:hover {
+            transform: scale(0.97);
+            filter: brightness(1.15);
+        }
+        .btn-start {
+            background: #2a6a4a;
+        }
+        .btn-pause {
+            background: #8a7a3a;
+        }
+        .btn-reset {
+            background: #6a3e3e;
+        }
+        .btn-reset:hover {
+            background: #8a5555;
+        }
+        .legend {
+            font-size: 11px;
+            color: #7aa0b8;
+            text-align: center;
+            border-top: 1px solid #2a4055;
+            padding-top: 10px;
+            margin-top: 6px;
+        }
+        .legend .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 4px;
+        }
+        .highlight {
+            color: #ffcc77;
+            font-weight: bold;
+        }
+        .badge {
+            display: inline-block;
+            background: #2a6a4a44;
+            border: 1px solid #4a8a6a;
+            border-radius: 20px;
+            padding: 0 10px;
+            font-size: 11px;
+            color: #88dd88;
+        }
+        .friction-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 4px;
+            border-radius: 2px;
+            background: #ff8844;
+            margin-right: 4px;
+        }
+        @media (max-width: 760px) {
+            .container { padding: 1rem; }
+            .stats-box { font-size: 11px; padding: 10px 14px; }
+            button { font-size: 11px; padding: 6px 10px; }
+            h1 { font-size: 1.2rem; }
+            .canvas-wrapper { min-width: 280px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>⚡ 动量守恒 · 完全弹性碰撞 (可调摩擦)</h1>
+    <div style="text-align: center;"><span class="sub">球2碰撞后 <span class="highlight">匀速/减速直线运动</span> · 动摩擦因数可调 · 动量/能量守恒</span></div>
+
+    <div class="main-layout">
+        <div class="canvas-wrapper">
+            <canvas id="mainCanvas" width="800" height="400"></canvas>
+        </div>
+        <div class="panel">
+            <div class="stats-box">
+                <div><span class="label">🔵 球1 速度</span><span class="value p1" id="v1Display">0.00</span> m/s</div>
+                <div><span class="label">🔴 球2 速度</span><span class="value p2" id="v2Display">0.00</span> m/s</div>
+                <div><span class="label">📦 总动量</span><span class="value" id="momentumDisplay">0.00</span> kg·m/s</div>
+                <div><span class="label">⚡ 总动能</span><span class="value" id="energyDisplay">0.00</span> J</div>
+                <div><span class="label">📊 状态</span><span id="stateDisplay" style="color:#88ddff;">就绪</span></div>
+                <div style="border-top:1px solid #2a4055; margin-top:4px; padding-top:4px; font-size:11px; color:#8ab4d0;">
+                    🏃 球2运动: <span id="motionTypeDisplay" style="color:#ffcc77;">匀速 → ∞</span> &nbsp;
+                    <span class="badge" id="frictionBadge">μ = 0.00</span>
+                </div>
+            </div>
+            <div class="controls-box">
+                <div class="ctrl-row">
+                    <label>m₁</label>
+                    <input type="range" id="m1Slider" min="0.1" max="5.0" step="0.05" value="1.0">
+                    <span id="m1Val">1.00</span>
+                </div>
+                <div class="ctrl-row">
+                    <label>m₂</label>
+                    <input type="range" id="m2Slider" min="0.1" max="5.0" step="0.05" value="1.0">
+                    <span id="m2Val">1.00</span>
+                </div>
+                <div class="ctrl-row">
+                    <label>v₁₀</label>
+                    <input type="range" id="v1Slider" min="0.0" max="8.0" step="0.1" value="4.0">
+                    <span id="v1InitVal">4.0</span>
+                </div>
+                <div class="ctrl-row">
+                    <label style="color:#ffaa66;">μ 地面</label>
+                    <input type="range" id="muSlider" min="0.0" max="0.5" step="0.01" value="0.0">
+                    <span id="muVal">0.00</span>
+                </div>
+                <div class="btn-group">
+                    <button id="startBtn" class="btn-start">▶ 启动</button>
+                    <button id="pauseBtn" class="btn-pause">⏸ 暂停</button>
+                    <button id="resetBtn" class="btn-reset">⟳ 重置</button>
+                </div>
+            </div>
+            <div class="legend">
+                <span><span class="dot" style="background:#4499ff;"></span>球1 (m₁)</span>
+                <span><span class="dot" style="background:#ff6644;"></span>球2 (m₂)</span>
+                <span style="margin-left:12px;">⬆ 速度矢量 | 弹性碰撞</span>
+                <span style="margin-left:12px; color:#ffaa66;">🧲 摩擦 μ 可调</span>
+                <span style="margin-left:12px; color:#ffcc77;" id="motionLegend">⟶ 匀速/减速</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ===== 物理参数 =====
+        const g = 9.8;
+        let m1 = 1.0, m2 = 1.0;
+        let v1_init = 4.0, v2_init = 0.0;
+        let mu = 0.0;  // 动摩擦因数，可调
+        
+        // 状态变量
+        let x1 = -2.5, x2 = 2.5;      // 位置 (m)
+        let v1 = 4.0, v2 = 0.0;        // 速度 (m/s)
+        let isRunning = false;
+        let isPaused = false;
+        let animId = null;
+        let lastTimestamp = 0;
+        let time = 0;
+        
+        // 碰撞检测
+        let collisionCooldown = 0;
+        let collisionCount = 0;
+        
+        // 初始能量动量
+        let initialMomentum = 0;
+        let initialEnergy = 0;
+        
+        // DOM
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const v1Display = document.getElementById('v1Display');
+        const v2Display = document.getElementById('v2Display');
+        const momentumDisplay = document.getElementById('momentumDisplay');
+        const energyDisplay = document.getElementById('energyDisplay');
+        const stateDisplay = document.getElementById('stateDisplay');
+        const motionTypeDisplay = document.getElementById('motionTypeDisplay');
+        const frictionBadge = document.getElementById('frictionBadge');
+        const motionLegend = document.getElementById('motionLegend');
+        
+        const m1Slider = document.getElementById('m1Slider');
+        const m2Slider = document.getElementById('m2Slider');
+        const v1Slider = document.getElementById('v1Slider');
+        const muSlider = document.getElementById('muSlider');
+        const m1Val = document.getElementById('m1Val');
+        const m2Val = document.getElementById('m2Val');
+        const v1InitVal = document.getElementById('v1InitVal');
+        const muVal = document.getElementById('muVal');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        
+        // 画布映射
+        const W = 800, H = 400;
+        canvas.width = W; canvas.height = H;
+        let scale = 80;       // px/m
+        let groundY = H - 50;
+        let offsetX = 180;
+        
+        // ===== 绘图函数 =====
+        function drawScene() {
+            ctx.clearRect(0, 0, W, H);
+            
+            // 背景
+            ctx.fillStyle = "#e8eef5";
+            ctx.fillRect(0, 0, W, H);
+            
+            // 地面 (根据摩擦系数显示不同纹理)
+            const grad = ctx.createLinearGradient(0, groundY, 0, H);
+            if (mu > 0.1) {
+                grad.addColorStop(0, "#c8b8a8");
+                grad.addColorStop(1, "#a89888");
+            } else if (mu > 0.01) {
+                grad.addColorStop(0, "#bcc9b8");
+                grad.addColorStop(1, "#9aaf8a");
+            } else {
+                grad.addColorStop(0, "#b8c9b8");
+                grad.addColorStop(1, "#8a9f7a");
+            }
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, groundY, W, H - groundY + 5);
+            
+            // 摩擦纹理 (粗糙度指示)
+            if (mu > 0.02) {
+                ctx.fillStyle = `rgba(100,80,60,${Math.min(0.15, mu * 0.4)})`;
+                for (let i = 0; i < W; i += 8) {
+                    const h = 2 + Math.sin(i * 0.5 + groundY) * 1.5;
+                    ctx.fillRect(i, groundY + 2 + Math.sin(i * 0.7) * 2, 2, h);
+                }
+            }
+            
+            // 光滑地面标记 (镜面效果)
+            ctx.fillStyle = `rgba(255,255,255,${mu < 0.05 ? 0.08 : 0.02})`;
+            ctx.fillRect(0, groundY-1, W, 3);
+            ctx.fillStyle = "rgba(0,0,0,0.03)";
+            ctx.fillRect(0, groundY+4, W, 2);
+            
+            // 无限远标记
+            ctx.fillStyle = "rgba(100,180,180,0.15)";
+            ctx.font = "18px sans-serif";
+            ctx.fillText("∞", W-30, groundY+28);
+            ctx.strokeStyle = "rgba(100,180,180,0.2)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(W-45, groundY+20);
+            ctx.lineTo(W-10, groundY+20);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(W-15, groundY+16);
+            ctx.lineTo(W-10, groundY+20);
+            ctx.lineTo(W-15, groundY+24);
+            ctx.stroke();
+            
+            // 刻度线
+            ctx.strokeStyle = "#aabbcc";
+            ctx.lineWidth = 0.5;
+            for (let i = -5; i <= 10; i++) {
+                if (i === 0) continue;
+                const px = offsetX + i * scale;
+                if (px > W - 20) break;
+                ctx.beginPath();
+                ctx.moveTo(px, groundY);
+                ctx.lineTo(px, groundY + 8);
+                ctx.stroke();
+                if (i >= -4 && i <= 5) {
+                    ctx.fillStyle = "#8899aa";
+                    ctx.font = "9px sans-serif";
+                    ctx.fillText(i + "m", px-6, groundY + 20);
+                }
+            }
+            ctx.fillStyle = "#8899aa";
+            ctx.font = "9px sans-serif";
+            ctx.fillText("0", offsetX-4, groundY + 20);
+            ctx.beginPath();
+            ctx.moveTo(offsetX, groundY);
+            ctx.lineTo(offsetX, groundY + 12);
+            ctx.stroke();
+            
+            // 摩擦系数显示在地面上
+            ctx.fillStyle = `rgba(80,60,40,${0.3 + mu * 0.5})`;
+            ctx.font = "11px monospace";
+            ctx.fillText(`μ = ${mu.toFixed(2)}`, 20, groundY + 20);
+            
+            // 球1 (蓝色)
+            const px1 = offsetX + x1 * scale;
+            const py1 = groundY - 12;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = "#4488ff44";
+            ctx.beginPath();
+            ctx.arc(px1, py1, 14, 0, 2*Math.PI);
+            const grad1 = ctx.createRadialGradient(px1-4, py1-6, 2, px1, py1, 14);
+            grad1.addColorStop(0, "#88ccff");
+            grad1.addColorStop(1, "#4499ff");
+            ctx.fillStyle = grad1;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "white";
+            ctx.font = "bold 12px sans-serif";
+            ctx.fillText("1", px1-4, py1+5);
+            
+            // 球2 (红色)
+            const px2 = offsetX + x2 * scale;
+            const py2 = groundY - 12;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = "#ff664444";
+            ctx.beginPath();
+            ctx.arc(px2, py2, 14, 0, 2*Math.PI);
+            const grad2 = ctx.createRadialGradient(px2-4, py2-6, 2, px2, py2, 14);
+            grad2.addColorStop(0, "#ffaa88");
+            grad2.addColorStop(1, "#ff6644");
+            ctx.fillStyle = grad2;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "white";
+            ctx.font = "bold 12px sans-serif";
+            ctx.fillText("2", px2-4, py2+5);
+            
+            // 速度箭头
+            const arrowScale = 6;
+            // 球1箭头
+            if (Math.abs(v1) > 0.02 && px1 > 20 && px1 < W-20) {
+                const len = Math.min(90, Math.abs(v1) * arrowScale + 12);
+                const dir = v1 > 0 ? 1 : -1;
+                const startX = px1 + (v1 > 0 ? 15 : -15);
+                const endX = px1 + dir * len;
+                ctx.beginPath();
+                ctx.moveTo(startX, py1);
+                ctx.lineTo(endX, py1);
+                ctx.strokeStyle = "#2266cc";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(endX, py1);
+                ctx.lineTo(endX - dir*10, py1-6);
+                ctx.lineTo(endX - dir*10, py1+6);
+                ctx.closePath();
+                ctx.fillStyle = "#2266cc";
+                ctx.fill();
+                ctx.fillStyle = "#2266cc";
+                ctx.font = "bold 11px monospace";
+                const labelX = (startX + endX) / 2 - 22;
+                ctx.fillText(v1.toFixed(2)+" m/s", labelX, py1-20);
+            } else if (Math.abs(v1) > 0.02) {
+                ctx.fillStyle = "#2266cc";
+                ctx.font = "bold 11px monospace";
+                ctx.fillText(v1.toFixed(2)+" m/s", px1-30, py1-25);
+            }
+            
+            // 球2箭头
+            if (Math.abs(v2) > 0.02 && px2 > 20 && px2 < W-20) {
+                const len = Math.min(90, Math.abs(v2) * arrowScale + 12);
+                const dir = v2 > 0 ? 1 : -1;
+                const startX = px2 + (v2 > 0 ? 15 : -15);
+                const endX = px2 + dir * len;
+                ctx.beginPath();
+                ctx.moveTo(startX, py2);
+                ctx.lineTo(endX, py2);
+                ctx.strokeStyle = "#cc4422";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(endX, py2);
+                ctx.lineTo(endX - dir*10, py2-6);
+                ctx.lineTo(endX - dir*10, py2+6);
+                ctx.closePath();
+                ctx.fillStyle = "#cc4422";
+                ctx.fill();
+                ctx.fillStyle = "#cc4422";
+                ctx.font = "bold 11px monospace";
+                const labelX = (startX + endX) / 2 - 22;
+                ctx.fillText(v2.toFixed(2)+" m/s", labelX, py2-20);
+            } else if (Math.abs(v2) > 0.02) {
+                ctx.fillStyle = "#cc4422";
+                ctx.font = "bold 11px monospace";
+                ctx.fillText(v2.toFixed(2)+" m/s", px2-30, py2-25);
+            }
+            
+            // 参数显示
+            ctx.fillStyle = "#224466";
+            ctx.font = "bold 12px monospace";
+            ctx.fillText(`m₁=${m1.toFixed(2)} kg  m₂=${m2.toFixed(2)} kg  μ=${mu.toFixed(2)}`, 20, 30);
+            const pTotal = m1*v1 + m2*v2;
+            const eTotal = 0.5*m1*v1*v1 + 0.5*m2*v2*v2;
+            ctx.fillStyle = "#224466";
+            ctx.font = "12px monospace";
+            ctx.fillText(`总动量 P = ${pTotal.toFixed(4)} kg·m/s`, 20, 54);
+            ctx.fillText(`总动能 E = ${eTotal.toFixed(4)} J`, 200, 54);
+            
+            // 碰撞标记
+            if (Math.abs(x1 - x2) < 0.3 && Math.abs(v1 - v2) > 0.1 && isRunning) {
+                ctx.fillStyle = "#ffaa44";
+                ctx.font = "bold 22px sans-serif";
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = "#ffaa44";
+                ctx.fillText("⚡ 弹性碰撞!", W/2-80, 70);
+                ctx.shadowBlur = 0;
+            }
+            
+            // 摩擦状态标签
+            ctx.fillStyle = `rgba(200,150,100,${0.1 + mu * 0.3})`;
+            ctx.font = "13px sans-serif";
+            const frictionLabel = mu < 0.01 ? "✦ 光滑表面 μ ≈ 0 ✦" : 
+                                  mu < 0.05 ? "✦ 微摩擦表面 ✦" :
+                                  mu < 0.15 ? "✦ 中摩擦表面 ✦" : "✦ 粗糙表面 ✦";
+            ctx.fillText(frictionLabel, W-200, groundY+35);
+            
+            // 球2运动状态显示在画布上
+            if (isRunning && collisionCount > 0) {
+                const motionState = mu < 0.001 ? "匀速直线运动 → ∞" :
+                                   (v2 > 0.01 ? "减速运动 (有摩擦)" : 
+                                    (Math.abs(v2) < 0.005 ? "已停止" : "减速中"));
+                ctx.fillStyle = "rgba(50,50,80,0.5)";
+                ctx.font = "12px monospace";
+                ctx.fillText(`球2: ${motionState}`, W-210, groundY+55);
+            }
+        }
+        
+        // ===== 物理更新 (可调摩擦) =====
+        function updatePhysics(dt) {
+            if (!isRunning || isPaused) return;
+            if (dt > 0.03) dt = 0.03;
+            
+            // 应用摩擦力 (动摩擦)
+            if (mu > 0) {
+                const fric1 = mu * g;
+                const fric2 = mu * g;
+                
+                // 球1摩擦力
+                if (v1 > 0.001) {
+                    v1 -= fric1 * dt;
+                    if (v1 < 0) v1 = 0;
+                } else if (v1 < -0.001) {
+                    v1 += fric1 * dt;
+                    if (v1 > 0) v1 = 0;
+                } else {
+                    v1 = 0;
+                }
+                
+                // 球2摩擦力
+                if (v2 > 0.001) {
+                    v2 -= fric2 * dt;
+                    if (v2 < 0) v2 = 0;
+                } else if (v2 < -0.001) {
+                    v2 += fric2 * dt;
+                    if (v2 > 0) v2 = 0;
+                } else {
+                    v2 = 0;
+                }
+            }
+            
+            // 更新位置
+            x1 += v1 * dt;
+            x2 += v2 * dt;
+            
+            // 碰撞检测 (完全弹性碰撞)
+            const dist = Math.abs(x1 - x2);
+            const radii = 0.12;
+            
+            if (dist < radii * 2.0 && (v1 - v2) > 0.001) {
+                // 完全弹性碰撞公式 (碰撞瞬间无能量损失)
+                const v1_final = ((m1 - m2) * v1 + 2 * m2 * v2) / (m1 + m2);
+                const v2_final = ((m2 - m1) * v2 + 2 * m1 * v1) / (m1 + m2);
+                
+                v1 = v1_final;
+                v2 = v2_final;
+                
+                // 防止重叠
+                const overlap = (radii * 2.0 - dist) / 2;
+                if (x1 < x2) {
+                    x1 -= overlap + 0.001;
+                    x2 += overlap + 0.001;
+                } else {
+                    x1 += overlap + 0.001;
+                    x2 -= overlap + 0.001;
+                }
+                
+                collisionCount++;
+                stateDisplay.textContent = `💥 碰撞 #${collisionCount}`;
+            }
+            
+            // 球1左边界限制
+            if (x1 < -5.0) { x1 = -5.0; v1 = Math.abs(v1); }
+            if (x1 > 5.0 && v1 > 0) { 
+                // 球1可以向右，但不限制
+            }
+            
+            // 更新运动状态显示
+            updateMotionType();
+            
+            // 更新显示
+            updateUI();
+            drawScene();
+        }
+        
+        function updateMotionType() {
+            if (collisionCount === 0) {
+                motionTypeDisplay.textContent = '⏳ 等待碰撞';
+                motionLegend.textContent = '⟶ 等待碰撞';
+                return;
+            }
+            
+            if (mu < 0.001) {
+                motionTypeDisplay.textContent = '🏃 匀速 → ∞';
+                motionLegend.textContent = '⟶ 匀速直线运动';
+            } else if (v2 > 0.01) {
+                motionTypeDisplay.textContent = '🐢 减速中 (摩擦)';
+                motionLegend.textContent = '⟶ 减速运动';
+            } else if (Math.abs(v2) < 0.005) {
+                motionTypeDisplay.textContent = '⏹ 已停止';
+                motionLegend.textContent = '⟶ 停止';
+            } else {
+                motionTypeDisplay.textContent = '↩️ 反向运动';
+                motionLegend.textContent = '⟶ 反向运动';
+            }
+            
+            frictionBadge.textContent = `μ = ${mu.toFixed(2)}`;
+        }
+        
+        function updateUI() {
+            v1Display.textContent = v1.toFixed(2);
+            v2Display.textContent = v2.toFixed(2);
+            const p = m1*v1 + m2*v2;
+            const e = 0.5*m1*v1*v1 + 0.5*m2*v2*v2;
+            momentumDisplay.textContent = p.toFixed(4);
+            energyDisplay.textContent = e.toFixed(4);
+            
+            if (isPaused) {
+                stateDisplay.textContent = '⏸ 暂停';
+            } else if (isRunning) {
+                if (stateDisplay.textContent.indexOf('碰撞') === -1 && stateDisplay.textContent.indexOf('停止') === -1) {
+                    stateDisplay.textContent = '▶ 运动进行中';
+                }
+            } else {
+                stateDisplay.textContent = '⏹ 已停止';
+            }
+        }
+        
+        // ===== 重置 =====
+        function resetSimulation() {
+            isRunning = false;
+            isPaused = false;
+            if (animId) cancelAnimationFrame(animId);
+            animId = null;
+            
+            m1 = parseFloat(m1Slider.value);
+            m2 = parseFloat(m2Slider.value);
+            v1_init = parseFloat(v1Slider.value);
+            mu = parseFloat(muSlider.value);
+            
+            v1 = v1_init;
+            v2 = 0;
+            x1 = -2.5;
+            x2 = 2.5;
+            time = 0;
+            collisionCount = 0;
+            
+            m1Val.textContent = m1.toFixed(2);
+            m2Val.textContent = m2.toFixed(2);
+            v1InitVal.textContent = v1_init.toFixed(1);
+            muVal.textContent = mu.toFixed(2);
+            
+            initialMomentum = m1 * v1 + m2 * v2;
+            initialEnergy = 0.5 * m1 * v1 * v1 + 0.5 * m2 * v2 * v2;
+            
+            updateMotionType();
+            updateUI();
+            drawScene();
+            stateDisplay.textContent = `🔄 已重置 (μ=${mu.toFixed(2)})`;
+            startBtn.textContent = '▶ 启动';
+            pauseBtn.textContent = '⏸ 暂停';
+        }
+        
+        // ===== 动画循环 =====
+        function animate(timestamp) {
+            if (!lastTimestamp) {
+                lastTimestamp = timestamp;
+                requestAnimationFrame(animate);
+                return;
+            }
+            const dt = Math.min(0.025, (timestamp - lastTimestamp) / 1000);
+            lastTimestamp = timestamp;
+            
+            if (isRunning && !isPaused) {
+                updatePhysics(dt);
+            } else {
+                drawScene();
+            }
+            requestAnimationFrame(animate);
+        }
+        
+        // ===== 控制函数 =====
+        function toggleStart() {
+            if (isRunning) {
+                resetSimulation();
+                isRunning = true;
+                startBtn.textContent = '⏹ 停止';
+                stateDisplay.textContent = '▶ 运动进行中';
+                return;
+            }
+            isRunning = true;
+            isPaused = false;
+            startBtn.textContent = '⏹ 停止';
+            pauseBtn.textContent = '⏸ 暂停';
+            stateDisplay.textContent = '▶ 运动进行中';
+            if (!animId) {
+                lastTimestamp = 0;
+                requestAnimationFrame(animate);
+            }
+        }
+        
+        function togglePause() {
+            if (!isRunning) return;
+            isPaused = !isPaused;
+            pauseBtn.textContent = isPaused ? '▶ 继续' : '⏸ 暂停';
+            stateDisplay.textContent = isPaused ? '⏸ 暂停' : '▶ 运动进行中';
+            if (!isPaused) {
+                lastTimestamp = 0;
+            }
+        }
+        
+        function onReset() {
+            resetSimulation();
+            startBtn.textContent = '▶ 启动';
+            pauseBtn.textContent = '⏸ 暂停';
+        }
+        
+        // ===== 滑块事件 =====
+        function onSliderChange() {
+            if (!isRunning) {
+                resetSimulation();
+            } else {
+                resetSimulation();
+            }
+        }
+        
+        m1Slider.addEventListener('input', onSliderChange);
+        m2Slider.addEventListener('input', onSliderChange);
+        v1Slider.addEventListener('input', onSliderChange);
+        muSlider.addEventListener('input', onSliderChange);
+        
+        startBtn.addEventListener('click', toggleStart);
+        pauseBtn.addEventListener('click', togglePause);
+        resetBtn.addEventListener('click', onReset);
+        
+        // ===== 初始化 =====
+        resetSimulation();
+        requestAnimationFrame(animate);
+        
+        console.log('✅ 动量守恒演示 (可调摩擦) 已启动');
+        console.log(`   - 当前摩擦系数 μ = ${mu}`);
+        console.log('   - 调整 μ 滑块观察摩擦对运动的影响');
+        console.log('   - 球2碰撞后受摩擦减速，μ=0时匀速无限远');
+    })();
+</script>
+</body>
+</html>
