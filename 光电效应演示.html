@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>光电效应演示</title>
+  <style>
+    :root { --bg:#f5f7fb; --panel:#fff; --ink:#183153; --muted:#667085; --accent:#3563e9; --canvas:#0b1020; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"Microsoft YaHei","Segoe UI",Arial,sans-serif; color:var(--ink); background:linear-gradient(135deg,#eef4ff,#f8fbff 45%,#f7f2ff); }
+    .page { max-width:1180px; margin:0 auto; padding:22px; }
+    h1 { margin:0 0 8px; font-size:30px; }
+    .subtitle { margin:0 0 18px; color:var(--muted); font-size:16px; }
+    .layout { display:grid; grid-template-columns:330px 1fr; gap:16px; }
+    .card { background:rgba(255,255,255,.92); border:1px solid rgba(53,99,233,.13); border-radius:18px; box-shadow:0 16px 40px rgba(24,49,83,.10); padding:16px; }
+    .control { margin-bottom:16px; }
+    label { display:flex; justify-content:space-between; gap:8px; margin-bottom:8px; font-weight:700; }
+    label span:last-child { color:var(--accent); font-variant-numeric:tabular-nums; }
+    input[type="range"] { width:100%; }
+    select,button { width:100%; border:1px solid #d8e1f3; border-radius:10px; padding:10px 12px; background:white; font-size:15px; }
+    button { cursor:pointer; color:white; background:var(--accent); border:none; font-weight:700; margin-top:4px; }
+    .formula { margin-top:16px; line-height:1.72; color:#243b61; }
+    .formula code { display:block; margin:6px 0; padding:8px 10px; background:#f0f5ff; border-radius:10px; color:#0f2f6f; font-family:Consolas,"Courier New",monospace; }
+    .stage-card { padding:0; overflow:hidden; }
+    canvas { display:block; width:100%; height:480px; background:var(--canvas); }
+    .result { margin-top:16px; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+    .metric { padding:12px; border-radius:14px; background:rgba(255,255,255,.92); border:1px solid rgba(53,99,233,.12); }
+    .metric .name { color:var(--muted); font-size:13px; margin-bottom:6px; }
+    .metric .value { font-family:Consolas,"Courier New",monospace; font-size:17px; font-weight:700; color:#102a56; }
+    .status { grid-column:1/-1; padding:14px 16px; border-radius:14px; color:white; font-weight:800; font-size:17px; background:#14915f; }
+    .status.off { background:#9b2c2c; }
+    .tips { margin-top:16px; color:#334e78; line-height:1.8; }
+    @media (max-width:900px) { .layout{grid-template-columns:1fr;} .result{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1>光电效应交互演示</h1>
+    <p class="subtitle">调节波长、光强、电压和金属材料，观察光电子是否逸出以及光电流如何变化。</p>
+
+    <section class="layout">
+      <aside class="card">
+        <div class="control">
+          <label for="material"><span>金属材料</span><span id="workValue">W₀ = 2.75 eV</span></label>
+          <select id="material">
+            <option value="2.14">铯 Cs（易发生）</option>
+            <option value="2.30">钾 K</option>
+            <option value="2.75" selected>钠 Na</option>
+            <option value="4.31">锌 Zn</option>
+            <option value="4.70">铜 Cu</option>
+          </select>
+        </div>
+        <div class="control"><label for="wavelength"><span>波长 λ</span><span id="wavelengthValue">420 nm</span></label><input id="wavelength" type="range" min="200" max="800" value="420" /></div>
+        <div class="control"><label for="intensity"><span>光强</span><span id="intensityValue">70%</span></label><input id="intensity" type="range" min="0" max="100" value="70" /></div>
+        <div class="control"><label for="voltage"><span>电压 U</span><span id="voltageValue">+0.0 V</span></label><input id="voltage" type="range" min="-5" max="5" step="0.1" value="0" /></div>
+        <button id="reset">恢复默认</button>
+        <div class="formula">
+          <strong>核心规律</strong>
+          <code>E = hν = hc / λ</code>
+          <code>hν ≥ W₀ 时发生光电效应</code>
+          <code>Kmax = hν - W₀</code>
+          <code>Uc = Kmax / e</code>
+        </div>
+      </aside>
+
+      <section>
+        <div class="card stage-card"><canvas id="stage" width="820" height="480"></canvas></div>
+        <div class="result" id="result">
+          <div class="metric"><div class="name">频率 ν</div><div class="value" id="frequency">-</div></div>
+          <div class="metric"><div class="name">光子能量</div><div class="value" id="energy">-</div></div>
+          <div class="metric"><div class="name">阈频 ν₀</div><div class="value" id="thresholdFrequency">-</div></div>
+          <div class="metric"><div class="name">阈波长 λ₀</div><div class="value" id="thresholdWavelength">-</div></div>
+          <div class="metric"><div class="name">最大初动能 Kmax</div><div class="value" id="kmax">-</div></div>
+          <div class="metric"><div class="name">截止电压 Uc</div><div class="value" id="stoppingVoltage">-</div></div>
+          <div class="metric"><div class="name">相对光电流</div><div class="value" id="current">-</div></div>
+          <div class="metric"><div class="name">当前颜色</div><div class="value" id="lightName">-</div></div>
+          <div class="status" id="status">-</div>
+        </div>
+      </section>
+    </section>
+
+    <section class="card tips">
+      <strong>教学观察：</strong>
+      <ol>
+        <li>减小波长会增大频率和光子能量，从而提高光电子最大初动能。</li>
+        <li>光强增加会让发射电子数量更多，但不会改变单个电子的最大初动能。</li>
+        <li>光子能量低于金属逸出功时，即使光强很大也不会发生光电效应。</li>
+        <li>反向电压逐渐增大，当达到截止电压时，光电流降为 0。</li>
+      </ol>
+    </section>
+  </main>
+
+  <script>
+    const H=6.62607015e-34,E=1.602176634e-19,C=299792458;
+    const canvas=document.getElementById('stage'),ctx=canvas.getContext('2d');
+    const els={material:gid('material'),wavelength:gid('wavelength'),intensity:gid('intensity'),voltage:gid('voltage'),workValue:gid('workValue'),wavelengthValue:gid('wavelengthValue'),intensityValue:gid('intensityValue'),voltageValue:gid('voltageValue'),frequency:gid('frequency'),energy:gid('energy'),thresholdFrequency:gid('thresholdFrequency'),thresholdWavelength:gid('thresholdWavelength'),kmax:gid('kmax'),stoppingVoltage:gid('stoppingVoltage'),current:gid('current'),lightName:gid('lightName'),status:gid('status'),reset:gid('reset')};
+    function gid(id){return document.getElementById(id)}
+    const electrons=[]; let frame=0;
+
+    function wavelengthToColor(w){
+      if(w<380)return'#9b7cff'; if(w>750)return'#8b1a1a';
+      const stops=[[380,'#7b2cff'],[450,'#2457ff'],[495,'#00a2ff'],[570,'#21b14b'],[590,'#ffd21f'],[620,'#ff8c1a'],[750,'#e53935']];
+      for(let i=0;i<stops.length-1;i++){const [w1,c1]=stops[i],[w2,c2]=stops[i+1]; if(w>=w1&&w<=w2){const t=(w-w1)/(w2-w1),a=hexToRgb(c1),b=hexToRgb(c2); return rgbToHex(Math.round(a.r+(b.r-a.r)*t),Math.round(a.g+(b.g-a.g)*t),Math.round(a.b+(b.b-a.b)*t));}}
+      return '#fff';
+    }
+    function lightName(w){if(w<380)return'紫外光'; if(w<450)return'紫光'; if(w<495)return'蓝光'; if(w<570)return'绿光'; if(w<590)return'黄光'; if(w<620)return'橙光'; if(w<=750)return'红光'; return'红外光';}
+    function hexToRgb(hex){return{r:parseInt(hex.slice(1,3),16),g:parseInt(hex.slice(3,5),16),b:parseInt(hex.slice(5,7),16)}}
+    function rgbToHex(r,g,b){return'#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('')}
+
+    function physics(){
+      const wavelengthNm=+els.wavelength.value,intensity=+els.intensity.value,voltage=+els.voltage.value,workFunctionEv=+els.material.value;
+      const frequency=C/(wavelengthNm*1e-9),photonEnergyEv=H*frequency/E,thresholdFrequency=workFunctionEv*E/H,thresholdWavelengthNm=C/thresholdFrequency*1e9;
+      const kmaxEv=Math.max(0,photonEnergyEv-workFunctionEv),stoppingVoltage=kmaxEv;
+      let current=0;
+      if(photonEnergyEv>=workFunctionEv&&voltage>=-stoppingVoltage){let voltageFactor=1; if(voltage<0&&stoppingVoltage>0)voltageFactor=Math.max(0,1+voltage/stoppingVoltage); current=intensity/100*voltageFactor;}
+      return{wavelengthNm,intensity,voltage,workFunctionEv,frequency,photonEnergyEv,thresholdFrequency,thresholdWavelengthNm,kmaxEv,stoppingVoltage,current,emits:current>0};
+    }
+
+    function updateText(d){
+      els.workValue.textContent=`W₀ = ${d.workFunctionEv.toFixed(2)} eV`; els.wavelengthValue.textContent=`${d.wavelengthNm.toFixed(0)} nm`; els.intensityValue.textContent=`${d.intensity.toFixed(0)}%`; els.voltageValue.textContent=`${d.voltage>=0?'+':''}${d.voltage.toFixed(1)} V`;
+      els.frequency.textContent=`${d.frequency.toExponential(3)} Hz`; els.energy.textContent=`${d.photonEnergyEv.toFixed(2)} eV`; els.thresholdFrequency.textContent=`${d.thresholdFrequency.toExponential(3)} Hz`; els.thresholdWavelength.textContent=`${d.thresholdWavelengthNm.toFixed(0)} nm`; els.kmax.textContent=`${d.kmaxEv.toFixed(2)} eV`; els.stoppingVoltage.textContent=`${d.stoppingVoltage.toFixed(2)} V`; els.current.textContent=d.current.toFixed(2); els.lightName.textContent=lightName(d.wavelengthNm);
+      els.status.textContent=d.emits?'状态：发生光电效应，电子逸出并形成光电流':'状态：不发生光电效应，或反向电压过大导致无光电流'; els.status.classList.toggle('off',!d.emits);
+    }
+    function resizeCanvas(){const r=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1; canvas.width=Math.round(r.width*dpr); canvas.height=Math.round(r.height*dpr); ctx.setTransform(dpr,0,0,dpr,0,0);}
+    function ensureElectrons(n,plateX,yMid){while(electrons.length<n){const i=electrons.length; electrons.push({x:plateX+28,y:yMid-90+(i*33)%180,phase:i*.7});} while(electrons.length>n)electrons.pop();}
+    function drawArrow(x1,y1,x2,y2,color,width=3){const a=Math.atan2(y2-y1,x2-x1); ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x2,y2); ctx.lineTo(x2-12*Math.cos(a-Math.PI/6),y2-12*Math.sin(a-Math.PI/6)); ctx.lineTo(x2-12*Math.cos(a+Math.PI/6),y2-12*Math.sin(a+Math.PI/6)); ctx.closePath(); ctx.fill();}
+    function roundRect(x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();}}
+
+    function draw(){
+      frame++; const d=physics(); updateText(d); const w=canvas.clientWidth,h=canvas.clientHeight,yMid=h*.52,plateX=w*.34,collectorX=w*.78,color=wavelengthToColor(d.wavelengthNm);
+      ctx.clearRect(0,0,w,h); ctx.fillStyle='#0b1020'; ctx.fillRect(0,0,w,h); ctx.strokeStyle='#111a33'; ctx.lineWidth=1;
+      for(let x=0;x<w;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();} for(let y=0;y<h;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+      const beamCount=Math.max(1,Math.round(d.intensity/18)); for(let i=0;i<beamCount;i++){drawArrow(32,yMid-110+i*32,plateX-18,yMid-28+i*10,color,3);}
+      ctx.font='700 18px Microsoft YaHei, Arial'; ctx.fillStyle=color; ctx.textAlign='left'; ctx.fillText(`入射光 λ=${d.wavelengthNm.toFixed(0)} nm（${lightName(d.wavelengthNm)}）`,28,38);
+      roundRect(plateX-18,yMid-125,36,250,8,'#b6c2d9','#edf2ff'); roundRect(collectorX-12,yMid-125,24,250,8,'#ffd166','#fff1b8');
+      ctx.font='15px Microsoft YaHei, Arial'; ctx.textAlign='center'; ctx.fillStyle='#edf2ff'; ctx.fillText('金属阴极',plateX,yMid+152); ctx.fillStyle='#fff1b8'; ctx.fillText('阳极/收集极',collectorX,yMid+152);
+      ctx.strokeStyle='#9fb3d9'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(plateX,yMid+125); ctx.lineTo(plateX,h-76); ctx.lineTo(collectorX,h-76); ctx.lineTo(collectorX,yMid+125); ctx.stroke();
+      ctx.strokeStyle='#8ef0ff'; ctx.beginPath(); ctx.arc(w*.55,h-76,32,0,Math.PI*2); ctx.stroke(); ctx.fillStyle='#8ef0ff'; ctx.font='700 24px Arial'; ctx.fillText('A',w*.55,h-68); ctx.fillStyle='#d8e5ff'; ctx.font='16px Consolas, monospace'; ctx.fillText(`U = ${d.voltage>=0?'+':''}${d.voltage.toFixed(1)} V    I = ${d.current.toFixed(2)}`,w*.55,h-22);
+      const target=d.emits?Math.max(2,Math.round(d.current*16)):0; ensureElectrons(target,plateX,yMid); const speed=2.6+d.kmaxEv*1.25+Math.max(0,d.voltage)*.35;
+      for(let i=0;i<electrons.length;i++){const e=electrons[i]; e.x+=speed; if(e.x>collectorX-18){e.x=plateX+28; e.y=yMid-90+((i*33+frame*3)%180);} const wobble=Math.sin(frame/8+e.phase)*10; ctx.beginPath(); ctx.fillStyle='#63e6ff'; ctx.shadowColor='#63e6ff'; ctx.shadowBlur=10; ctx.arc(e.x,e.y+wobble,5,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;}
+      ctx.textAlign='right'; ctx.font='700 18px Microsoft YaHei, Arial'; ctx.fillStyle='#fff'; ctx.fillText(d.emits?'电子逸出并被收集':'能量不足或反向电压过大：无电子到达',w-24,38); requestAnimationFrame(draw);
+    }
+    for(const el of [els.material,els.wavelength,els.intensity,els.voltage]){el.addEventListener('input',()=>updateText(physics())); el.addEventListener('change',()=>updateText(physics()));}
+    els.reset.addEventListener('click',()=>{els.material.value='2.75'; els.wavelength.value='420'; els.intensity.value='70'; els.voltage.value='0'; updateText(physics());});
+    window.addEventListener('resize',resizeCanvas); resizeCanvas(); updateText(physics()); requestAnimationFrame(draw);
+  </script>
+</body>
+</html>
