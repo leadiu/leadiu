@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>感生电动势动画演示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: "Microsoft YaHei", "SimHei", "PingFang SC", sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 24px;
+            color: #1a1a2e;
+            margin-bottom: 8px;
+        }
+        .header .subtitle {
+            font-size: 16px;
+            color: #4a4a6a;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 12px 24px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .control-group label {
+            font-size: 14px;
+            color: #555;
+            white-space: nowrap;
+        }
+        button {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        #playBtn {
+            background: #4CAF50;
+            color: white;
+        }
+        #playBtn:hover {
+            background: #45a049;
+        }
+        #resetBtn {
+            background: #2196F3;
+            color: white;
+        }
+        #resetBtn:hover {
+            background: #1e88e5;
+        }
+        input[type="range"] {
+            width: 120px;
+            cursor: pointer;
+        }
+        .info-display {
+            font-size: 13px;
+            color: #666;
+            font-family: monospace;
+        }
+        .canvas-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 16px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .canvas-card {
+            background: white;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .canvas-card h3 {
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .physics-info {
+            max-width: 1000px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 12px;
+            padding: 16px 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .physics-info h3 {
+            font-size: 16px;
+            color: #1a1a2e;
+            margin-bottom: 10px;
+        }
+        .physics-info ul {
+            list-style: none;
+            padding: 0;
+        }
+        .physics-info li {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 6px;
+            padding-left: 20px;
+            position: relative;
+        }
+        .physics-info li::before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: #4CAF50;
+        }
+        .physics-info .formula {
+            font-family: "Times New Roman", serif;
+            font-style: italic;
+            color: #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>感生电动势动画演示</h1>
+        <div class="subtitle">变化的磁场 → 涡旋电场 → 感应电动势</div>
+    </div>
+
+    <div class="controls">
+        <button id="playBtn">⏸ 暂停</button>
+        <button id="resetBtn">⟲ 重置</button>
+        <div class="control-group">
+            <label>速度:</label>
+            <input type="range" id="speedSlider" min="0.2" max="3" step="0.2" value="1">
+            <span id="speedValue">1.0×</span>
+        </div>
+        <div class="control-group">
+            <span class="info-display" id="timeDisplay">t = 0.00s</span>
+        </div>
+    </div>
+
+    <div class="canvas-grid">
+        <div class="canvas-card">
+            <h3>(a) 变化磁场 B(t)</h3>
+            <canvas id="canvasB" width="450" height="350"></canvas>
+        </div>
+        <div class="canvas-card">
+            <h3>(b) 涡旋电场 E(t)</h3>
+            <canvas id="canvasE" width="450" height="350"></canvas>
+        </div>
+        <div class="canvas-card">
+            <h3>(c) 导体回路中的感应电动势</h3>
+            <canvas id="canvasLoop" width="450" height="350"></canvas>
+        </div>
+        <div class="canvas-card">
+            <h3>(d) 物理量随时间变化</h3>
+            <canvas id="canvasGraph" width="450" height="350"></canvas>
+        </div>
+    </div>
+
+    <div class="physics-info">
+        <h3>物理原理</h3>
+        <ul>
+            <li>磁场随时间正弦变化：<span class="formula">B(t) = B₀ sin(ωt)</span>，垂直于平面（红色表示正向穿出 ⊙，蓝色表示反向穿入 ⊗）</li>
+            <li>变化的磁场在空间激发涡旋电场（感生电场）：<span class="formula">E = -(r/2)·dB/dt</span>，电场线为同心圆</li>
+            <li>导体回路中的感应电动势：<span class="formula">ε = -dΦ/dt = -πr²·dB/dt</span></li>
+            <li>感应电流方向遵循<strong>楞次定律</strong>：感应电流的磁场总是阻碍引起感应电流的磁通量变化</li>
+        </ul>
+    </div>
+
+    <script>
+        // ==================== 参数设置 ====================
+        const R_MAX = 3.0;
+        const N_GRID = 20;
+        const LOOP_RADIUS = 1.5;
+        const B0 = 1.0;
+        const OMEGA = 2 * Math.PI;
+        const DT = 0.016; // 约60fps
+
+        // ==================== 状态变量 ====================
+        let t = 0;
+        let isPlaying = true;
+        let speed = 1.0;
+        const history = {
+            times: [],
+            B: [],
+            dBdt: [],
+            emf: []
+        };
+        const MAX_HISTORY = 300;
+
+        // ==================== Canvas 获取 ====================
+        const canvasB = document.getElementById('canvasB');
+        const canvasE = document.getElementById('canvasE');
+        const canvasLoop = document.getElementById('canvasLoop');
+        const canvasGraph = document.getElementById('canvasGraph');
+        const ctxB = canvasB.getContext('2d');
+        const ctxE = canvasE.getContext('2d');
+        const ctxLoop = canvasLoop.getContext('2d');
+        const ctxGraph = canvasGraph.getContext('2d');
+
+        // ==================== 坐标变换 ====================
+        function worldToCanvas(ctx, x, y, scale) {
+            const w = ctx.canvas.width;
+            const h = ctx.canvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+            return {
+                x: cx + x * scale,
+                y: cy - y * scale
+            };
+        }
+
+        function getScale(ctx) {
+            return Math.min(ctx.canvas.width, ctx.canvas.height) / (2 * R_MAX * 1.15);
+        }
+
+        // ==================== 物理计算 ====================
+        function computeFields(time) {
+            const B_t = B0 * Math.sin(OMEGA * time);
+            const dBdt = B0 * OMEGA * Math.cos(OMEGA * time);
+            return { B_t, dBdt };
+        }
+
+        function computeEMF(time) {
+            return -Math.cos(OMEGA * time);
+        }
+
+        // ==================== 绘制辅助函数 ====================
+        function clearCanvas(ctx) {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        }
+
+        function drawGrid(ctx, scale) {
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 0.5;
+            for (let i = -3; i <= 3; i++) {
+                const p1 = worldToCanvas(ctx, i, -R_MAX, scale);
+                const p2 = worldToCanvas(ctx, i, R_MAX, scale);
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+
+                const p3 = worldToCanvas(ctx, -R_MAX, i, scale);
+                const p4 = worldToCanvas(ctx, R_MAX, i, scale);
+                ctx.beginPath();
+                ctx.moveTo(p3.x, p3.y);
+                ctx.lineTo(p4.x, p4.y);
+                ctx.stroke();
+            }
+
+            // 坐标轴
+            ctx.strokeStyle = '#aaa';
+            ctx.lineWidth = 1;
+            const origin = worldToCanvas(ctx, 0, 0, scale);
+            const xEnd = worldToCanvas(ctx, R_MAX, 0, scale);
+            const yEnd = worldToCanvas(ctx, 0, R_MAX, scale);
+
+            ctx.beginPath();
+            ctx.moveTo(origin.x - (xEnd.x - origin.x), origin.y);
+            ctx.lineTo(xEnd.x, xEnd.y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(origin.x, origin.y + (origin.y - yEnd.y));
+            ctx.lineTo(yEnd.x, yEnd.y);
+            ctx.stroke();
+
+            // 轴标签
+            ctx.fillStyle = '#888';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('x', xEnd.x + 10, origin.y + 4);
+            ctx.textAlign = 'right';
+            ctx.fillText('y', origin.x - 4, yEnd.y - 8);
+        }
+
+        // ==================== (a) 绘制磁场分布 ====================
+        function drawMagneticField(ctx, B_t) {
+            clearCanvas(ctx);
+            const scale = getScale(ctx);
+            const w = ctx.canvas.width;
+            const h = ctx.canvas.height;
+
+            // 背景色表示磁场
+            const B_norm = B_t / B0;
+            let r, g, b;
+            if (B_norm >= 0) {
+                // 红色渐变
+                const intensity = 0.15 + 0.25 * B_norm;
+                r = Math.floor(255 * intensity);
+                g = Math.floor(240 * (1 - intensity * 0.5));
+                b = Math.floor(240 * (1 - intensity * 0.5));
+            } else {
+                // 蓝色渐变
+                const intensity = 0.15 + 0.25 * Math.abs(B_norm);
+                r = Math.floor(240 * (1 - intensity * 0.5));
+                g = Math.floor(240 * (1 - intensity * 0.5));
+                b = Math.floor(255 * intensity);
+            }
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(0, 0, w, h);
+
+            drawGrid(ctx, scale);
+
+            // 中心方向符号
+            const center = worldToCanvas(ctx, 0, 0, scale);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (Math.abs(B_t) > 0.05) {
+                ctx.font = 'bold 80px serif';
+                ctx.fillStyle = B_t > 0 ? '#8B0000' : '#00008B';
+                ctx.fillText(B_t > 0 ? '⊙' : '⊗', center.x, center.y);
+            }
+
+            // B 值文字
+            ctx.font = 'bold 14px sans-serif';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'left';
+            ctx.fillText(`B = ${B_t.toFixed(2)} T`, 10, 20);
+        }
+
+        // ==================== (b) 绘制涡旋电场 ====================
+        function drawElectricField(ctx, dBdt) {
+            clearCanvas(ctx);
+            const scale = getScale(ctx);
+
+            ctx.fillStyle = '#fafafa';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            drawGrid(ctx, scale);
+
+            // 绘制同心圆电场线
+            ctx.strokeStyle = '#90CAF9';
+            ctx.lineWidth = 1;
+            const center = worldToCanvas(ctx, 0, 0, scale);
+
+            for (let r = 0.5; r <= 2.5; r += 0.5) {
+                ctx.beginPath();
+                ctx.arc(center.x, center.y, r * scale, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
+
+            // 绘制电场矢量箭头
+            if (Math.abs(dBdt) > 0.01) {
+                const arrowColor = dBdt > 0 ? '#4CAF50' : '#9C27B0';
+                ctx.strokeStyle = arrowColor;
+                ctx.fillStyle = arrowColor;
+
+                for (let ix = -3; ix <= 3; ix++) {
+                    for (let iy = -3; iy <= 3; iy++) {
+                        if (ix === 0 && iy === 0) continue;
+                        const wx = ix * 0.8;
+                        const wy = iy * 0.8;
+                        const wr = Math.sqrt(wx * wx + wy * wy);
+                        if (wr < 0.2 || wr > 2.8) continue;
+
+                        // E = -(r/2)*dB/dt * phi_hat
+                        // Ex = -(y/2)*dBdt, Ey = (x/2)*dBdt
+                        const Ex = -(wy / 2) * dBdt;
+                        const Ey = (wx / 2) * dBdt;
+                        const Emag = Math.sqrt(Ex * Ex + Ey * Ey);
+                        const Emax = Math.abs(dBdt) * 1.5 + 0.001;
+
+                        const pos = worldToCanvas(ctx, wx, wy, scale);
+                        const arrowLen = 18 * (Emag / Emax);
+
+                        // 角向方向
+                        const angle = Math.atan2(Ey, Ex);
+                        const endX = pos.x + arrowLen * Math.cos(angle);
+                        const endY = pos.y - arrowLen * Math.sin(angle);
+
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.moveTo(pos.x, pos.y);
+                        ctx.lineTo(endX, endY);
+                        ctx.stroke();
+
+                        // 箭头头部
+                        const headLen = 5;
+                        const headAngle = Math.PI / 6;
+                        ctx.beginPath();
+                        ctx.moveTo(endX, endY);
+                        ctx.lineTo(
+                            endX - headLen * Math.cos(angle - headAngle),
+                            endY + headLen * Math.sin(angle - headAngle)
+                        );
+                        ctx.lineTo(
+                            endX - headLen * Math.cos(angle + headAngle),
+                            endY + headLen * Math.sin(angle + headAngle)
+                        );
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // dB/dt 文字
+            ctx.font = 'bold 14px sans-serif';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'left';
+            ctx.fillText(`dB/dt = ${dBdt.toFixed(2)}`, 10, 20);
+        }
+
+        // ==================== (c) 绘制导体回路 ====================
+        function drawLoop(ctx, B_t, dBdt, emf) {
+            clearCanvas(ctx);
+            const scale = getScale(ctx);
+
+            ctx.fillStyle = '#fafafa';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            drawGrid(ctx, scale);
+
+            const center = worldToCanvas(ctx, 0, 0, scale);
+
+            // 绘制导体回路
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, LOOP_RADIUS * scale, 0, 2 * Math.PI);
+            ctx.stroke();
+
+            // 绘制感应电流箭头
+            if (Math.abs(dBdt) > 0.05) {
+                const isCounterClockwise = dBdt < 0;
+                const nArrows = 8;
+                ctx.fillStyle = '#F44336';
+                ctx.strokeStyle = '#F44336';
+
+                for (let i = 0; i < nArrows; i++) {
+                    const theta = (2 * Math.PI * i) / nArrows;
+                    const xPos = Math.cos(theta) * LOOP_RADIUS;
+                    const yPos = Math.sin(theta) * LOOP_RADIUS;
+                    const pos = worldToCanvas(ctx, xPos, yPos, scale);
+
+                    // 切向方向
+                    let dx, dy;
+                    if (isCounterClockwise) {
+                        dx = -0.25 * Math.sin(theta);
+                        dy = 0.25 * Math.cos(theta);
+                    } else {
+                        dx = 0.25 * Math.sin(theta);
+                        dy = -0.25 * Math.cos(theta);
+                    }
+
+                    const start = worldToCanvas(ctx, xPos - dx, yPos - dy, scale);
+                    const end = worldToCanvas(ctx, xPos + dx, yPos + dy, scale);
+
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(start.x, start.y);
+                    ctx.lineTo(end.x, end.y);
+                    ctx.stroke();
+
+                    // 箭头
+                    const angle = Math.atan2(start.y - end.y, end.x - start.x);
+                    const headLen = 6;
+                    ctx.beginPath();
+                    ctx.moveTo(end.x, end.y);
+                    ctx.lineTo(
+                        end.x - headLen * Math.cos(angle - Math.PI / 6),
+                        end.y - headLen * Math.sin(angle - Math.PI / 6)
+                    );
+                    ctx.lineTo(
+                        end.x - headLen * Math.cos(angle + Math.PI / 6),
+                        end.y - headLen * Math.sin(angle + Math.PI / 6)
+                    );
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                // 方向标注
+                ctx.font = 'bold 13px sans-serif';
+                ctx.fillStyle = '#F44336';
+                ctx.textAlign = 'center';
+                const dirText = isCounterClockwise ? '感应电流: 逆时针' : '感应电流: 顺时针';
+                const textPos = worldToCanvas(ctx, 0, -2.3, scale);
+                ctx.fillText(dirText, textPos.x, textPos.y);
+            }
+
+            // 中心磁场符号
+            if (Math.abs(B_t) > 0.05) {
+                ctx.font = 'bold 50px serif';
+                ctx.fillStyle = B_t > 0 ? 'rgba(139,0,0,0.5)' : 'rgba(0,0,139,0.5)';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(B_t > 0 ? '⊙' : '⊗', center.x, center.y);
+            }
+
+            // 感应电动势值
+            ctx.font = 'bold 14px sans-serif';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            const emfPos = worldToCanvas(ctx, 0, 2.4, scale);
+            ctx.fillText(`ε = ${emf.toFixed(2)} V`, emfPos.x, emfPos.y);
+        }
+
+        // ==================== (d) 绘制时间变化图 ====================
+        function drawGraph(ctx, currentT) {
+            clearCanvas(ctx);
+            const w = ctx.canvas.width;
+            const h = ctx.canvas.height;
+            const padding = { left: 45, right: 15, top: 25, bottom: 40 };
+
+            ctx.fillStyle = '#fafafa';
+            ctx.fillRect(0, 0, w, h);
+
+            const graphW = w - padding.left - padding.right;
+            const graphH = h - padding.top - padding.bottom;
+
+            // 绘制坐标轴
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top);
+            ctx.lineTo(padding.left, h - padding.bottom);
+            ctx.lineTo(w - padding.right, h - padding.bottom);
+            ctx.stroke();
+
+            // 零点线
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 0.5;
+            const zeroY = padding.top + graphH / 2;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, zeroY);
+            ctx.lineTo(w - padding.right, zeroY);
+            ctx.stroke();
+
+            // Y轴刻度
+            ctx.fillStyle = '#888';
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'right';
+            for (let val = -1; val <= 1; val += 0.5) {
+                const y = padding.top + graphH * (1 - (val + 1.5) / 3);
+                ctx.fillText(val.toFixed(1), padding.left - 5, y + 4);
+            }
+
+            // X轴刻度
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#888';
+            const tMax = 4;
+            for (let tVal = 0; tVal <= tMax; tVal++) {
+                const x = padding.left + (tVal / tMax) * graphW;
+                ctx.fillText(tVal.toFixed(0), x, h - padding.bottom + 15);
+            }
+
+            // 轴标签
+            ctx.fillStyle = '#555';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('时间 t (s)', padding.left + graphW / 2, h - 8);
+
+            ctx.save();
+            ctx.translate(15, padding.top + graphH / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('幅值 (归一化)', 0, 0);
+            ctx.restore();
+
+            // 网格线
+            ctx.strokeStyle = '#eee';
+            ctx.lineWidth = 0.5;
+            for (let val = -1; val <= 1; val += 0.5) {
+                const y = padding.top + graphH * (1 - (val + 1.5) / 3);
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(w - padding.right, y);
+                ctx.stroke();
+            }
+
+            // 绘制历史曲线
+            if (history.times.length > 1) {
+                const tStart = Math.max(0, currentT - 4);
+
+                function drawCurve(data, color, lineStyle) {
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash(lineStyle || []);
+                    ctx.beginPath();
+                    let started = false;
+
+                    for (let i = 0; i < history.times.length; i++) {
+                        if (history.times[i] < tStart) continue;
+                        const x = padding.left + ((history.times[i] - tStart) / 4) * graphW;
+                        const y = padding.top + graphH * (1 - (data[i] + 1.5) / 3);
+
+                        if (!started) {
+                            ctx.moveTo(x, y);
+                            started = true;
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    }
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                drawCurve(history.B, '#2196F3');
+                drawCurve(history.dBdt, '#4CAF50', [5, 3]);
+                drawCurve(history.emf, '#F44336', [3, 3]);
+
+                // 当前时间线
+                const currentX = padding.left + ((currentT - tStart) / 4) * graphW;
+                if (currentX >= padding.left && currentX <= w - padding.right) {
+                    ctx.strokeStyle = '#999';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([2, 2]);
+                    ctx.beginPath();
+                    ctx.moveTo(currentX, padding.top);
+                    ctx.lineTo(currentX, h - padding.bottom);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+
+            // 图例
+            const legendX = w - padding.right - 120;
+            const legendY = padding.top + 5;
+            const legends = [
+                { color: '#2196F3', text: 'B(t)', style: [] },
+                { color: '#4CAF50', text: 'dB/dt', style: [5, 3] },
+                { color: '#F44336', text: 'ε(t)', style: [3, 3] }
+            ];
+
+            legends.forEach((leg, i) => {
+                const y = legendY + i * 16;
+                ctx.strokeStyle = leg.color;
+                ctx.lineWidth = 2;
+                ctx.setLineDash(leg.style);
+                ctx.beginPath();
+                ctx.moveTo(legendX, y);
+                ctx.lineTo(legendX + 20, y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = leg.color;
+                ctx.font = '11px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(leg.text, legendX + 25, y + 4);
+            });
+        }
+
+        // ==================== 更新历史数据 ====================
+        function updateHistory(time, B_t, dBdt, emf) {
+            history.times.push(time);
+            history.B.push(Math.sin(OMEGA * time));
+            history.dBdt.push(Math.cos(OMEGA * time));
+            history.emf.push(emf);
+
+            while (history.times.length > MAX_HISTORY) {
+                history.times.shift();
+                history.B.shift();
+                history.dBdt.shift();
+                history.emf.shift();
+            }
+        }
+
+        // ==================== 主动画循环 ====================
+        let lastTime = 0;
+
+        function animate(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            if (isPlaying) {
+                t += deltaTime * speed;
+                if (t > 10) t = 0; // 循环
+            }
+
+            const { B_t, dBdt } = computeFields(t);
+            const emf = computeEMF(t);
+
+            updateHistory(t, B_t, dBdt, emf);
+
+            drawMagneticField(ctxB, B_t);
+            drawElectricField(ctxE, dBdt);
+            drawLoop(ctxLoop, B_t, dBdt, emf);
+            drawGraph(ctxGraph, t);
+
+            document.getElementById('timeDisplay').textContent = `t = ${t.toFixed(2)}s`;
+
+            requestAnimationFrame(animate);
+        }
+
+        // ==================== 控制事件 ====================
+        const playBtn = document.getElementById('playBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+
+        playBtn.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            playBtn.textContent = isPlaying ? '⏸ 暂停' : '▶ 播放';
+        });
+
+        resetBtn.addEventListener('click', () => {
+            t = 0;
+            history.times = [];
+            history.B = [];
+            history.dBdt = [];
+            history.emf = [];
+            if (!isPlaying) {
+                const { B_t, dBdt } = computeFields(0);
+                const emf = computeEMF(0);
+                drawMagneticField(ctxB, B_t);
+                drawElectricField(ctxE, dBdt);
+                drawLoop(ctxLoop, B_t, dBdt, emf);
+                drawGraph(ctxGraph, 0);
+            }
+        });
+
+        speedSlider.addEventListener('input', (e) => {
+            speed = parseFloat(e.target.value);
+            speedValue.textContent = speed.toFixed(1) + '×';
+        });
+
+        // ==================== 启动 ====================
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>
