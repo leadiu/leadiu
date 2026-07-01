@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>圆盘切割模型 — 法拉第电磁感应</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+    --bg1:#eef1f5;--bg2:#e2e6ed;--card:#fff;--card2:#f8f9fb;
+    --text:#1a1a2e;--text2:#555;--text3:#888;--border:#e0e2e6;
+    --primary:#4a7cf7;--primary-hover:#3a66d0;--accent:#34a853;
+    --red:#d32f2f;--orange:#e65100;--blue:#1565c0;--green:#2e7d32;--purple:#7b1fa2;
+    --gold:rgba(255,215,0,.13);--shadow:0 6px 32px rgba(0,0,0,.10);
+    --radius:18px;--radius-sm:10px;--radius-xs:8px;
+    --font:'Microsoft YaHei','PingFang SC','SimHei',sans-serif
+}
+body.dark{
+    --bg1:#0f0f1a;--bg2:#1a1a2e;--card:#1e1e32;--card2:#252540;
+    --text:#e8e8f0;--text2:#b0b0c0;--text3:#707080;--border:#333350;
+    --shadow:0 6px 32px rgba(0,0,0,.35);--gold:rgba(255,215,0,.08)
+}
+body{
+    font-family:var(--font);
+    background:linear-gradient(135deg,var(--bg1) 0,var(--bg2) 100%);
+    display:flex;justify-content:center;padding:20px;min-height:100vh;
+    transition:background .4s,color .3s
+}
+.container{
+    max-width:1140px;width:100%;background:var(--card);
+    border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:24px 28px 22px;transition:background .4s
+}
+/* ===== Header ===== */
+.header{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:2px;flex-wrap:wrap;gap:6px
+}
+.header h1{
+    font-size:22px;color:var(--text);letter-spacing:1px;
+    transition:color .3s
+}
+.header h1 span{color:var(--primary)}
+.theme-toggle{
+    background:var(--card2);border:1px solid var(--border);
+    border-radius:20px;padding:4px 12px;cursor:pointer;
+    font-size:13px;color:var(--text2);font-family:inherit;
+    transition:all .2s;display:flex;align-items:center;gap:4px
+}
+.theme-toggle:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+.subtitle{
+    text-align:center;font-size:13px;color:var(--text3);margin-bottom:16px;
+    transition:color .3s
+}
+
+/* ===== Canvas 行 ===== */
+.canvas-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;margin-bottom:16px
+}
+.canvas-box{
+    background:var(--card2);border:1px solid var(--border);border-radius:var(--radius-sm);
+    padding:6px;box-shadow:0 1px 4px rgba(0,0,0,.04);
+    position:relative;transition:background .4s,border .4s;
+    overflow:hidden;
+}
+.canvas-box canvas{
+    display:block;width:100%;height:auto;border-radius:6px;
+    background:#fcfcfd;transition:background .3s;
+    max-width:100%;max-height:100%;
+}
+body.dark .canvas-box canvas{background:#1a1a2e}
+.canvas-box .badge{
+    position:absolute;top:10px;left:10px;
+    background:rgba(74,124,247,.88);color:#fff;
+    font-size:11px;padding:2px 10px;border-radius:12px;
+    font-weight:600;pointer-events:none;backdrop-filter:blur(4px);
+    z-index:2
+}
+body.dark .canvas-box .badge{background:rgba(74,124,247,.7)}
+
+/* ===== 控制面板 ===== */
+.controls{
+    background:var(--card2);border:1px solid var(--border);border-radius:var(--radius-sm);
+    padding:12px 16px 10px;margin-bottom:10px;
+    transition:background .4s,border .4s
+}
+.ctrl-row{
+    display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;margin-bottom:6px
+}
+.ctrl-row:last-child{margin-bottom:0}
+.cg{
+    display:flex;align-items:center;gap:4px
+}
+.cg label{
+    font-size:13px;color:var(--text2);white-space:nowrap;
+    font-weight:500;min-width:12px;transition:color .3s
+}
+.cg .val{
+    font-size:13px;color:var(--text);font-weight:700;min-width:40px;text-align:right;
+    transition:color .3s
+}
+.cg .unit{font-size:11px;color:var(--text3);margin-left:-1px}
+
+/* range 滑块 */
+input[type=range]{
+    -webkit-appearance:none;appearance:none;
+    width:92px;height:4px;border-radius:2px;
+    background:#d0d4da;outline:none;transition:background .15s;cursor:pointer
+}
+input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;
+    width:16px;height:16px;border-radius:50%;
+    background:var(--primary);cursor:pointer;border:2px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.18);transition:transform .12s,background .2s
+}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.18)}
+input[type=range]::-moz-range-thumb{
+    width:16px;height:16px;border-radius:50%;
+    background:var(--primary);cursor:pointer;border:2px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.18)
+}
+input[type=range]:hover{background:#c0c6ce}
+input[type=range]:focus{background:#b0b8c2}
+body.dark input[type=range]{background:#3a3a50}
+body.dark input[type=range]:hover{background:#4a4a60}
+body.dark input[type=range]:focus{background:#5a5a70}
+
+/* 按钮 */
+.btn{
+    padding:5px 16px;border:none;border-radius:6px;
+    font-size:13px;font-weight:600;cursor:pointer;
+    transition:all .18s;font-family:inherit;user-select:none
+}
+.btn:active{transform:scale(.93)}
+.btn-play{background:var(--primary);color:#fff}
+.btn-play:hover{background:var(--primary-hover)}
+.btn-play.paused{background:var(--accent)}
+.btn-play.paused:hover{background:#2d8f47}
+.btn-reset{background:#e8eaed;color:#555}
+.btn-reset:hover{background:#d2d5db}
+body.dark .btn-reset{background:#3a3a50;color:#ccc}
+body.dark .btn-reset:hover{background:#4a4a60}
+
+.kbd-hint{font-size:10px;color:var(--text3);margin-left:6px}
+
+/* ===== 公式面板 ===== */
+.formula-bar{
+    display:flex;flex-wrap:wrap;align-items:center;gap:4px 20px;
+    padding:8px 14px;background:var(--card2);border-radius:var(--radius-xs);
+    border:1px solid var(--border);font-size:13px;color:var(--text2);margin-bottom:8px;
+    transition:background .2s,border .4s,color .3s
+}
+.formula-bar .section{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.formula-bar .hl{color:var(--red);font-weight:700}
+.formula-bar .hi{color:var(--orange);font-weight:700}
+.formula-bar .hp{color:var(--purple);font-weight:700}
+.formula-bar .sep{color:var(--text3)}
+.formula-bar .label{color:var(--text3)}
+
+/* ===== 信息栏 ===== */
+.info-bar{
+    display:flex;flex-wrap:wrap;gap:4px 18px;
+    padding:7px 14px;background:#fffbe6;border-radius:var(--radius-xs);
+    border:1px solid #f0e8c0;font-size:13px;color:#444;align-items:center;
+    transition:background .4s,border .4s
+}
+body.dark .info-bar{
+    background:#2a2a1e;border-color:#4a4a30;color:#ccc
+}
+.info-bar span{white-space:nowrap}
+.info-bar .l{color:#999}
+.info-bar .v{font-weight:700;color:#222}
+body.dark .info-bar .v{color:#ddd}
+.info-bar .vr{color:var(--red)}
+.info-bar .vo{color:var(--orange)}
+.info-bar .vb{color:var(--blue)}
+.info-bar .vg{color:var(--green)}
+.info-bar .vp{color:var(--purple)}
+
+/* ===== 物理数据面板 ===== */
+.data-dashboard{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+    gap:8px;margin-bottom:10px
+}
+.data-card{
+    background:var(--card2);border:1px solid var(--border);
+    border-radius:var(--radius-xs);padding:8px 12px;
+    text-align:center;transition:all .2s,border .4s,background .4s;
+    cursor:default;position:relative;overflow:hidden
+}
+.data-card::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:3px;
+    background:var(--primary);border-radius:var(--radius-xs) var(--radius-xs) 0 0;
+    opacity:.6
+}
+.data-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.08)}
+body.dark .data-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.data-card .d-label{font-size:11px;color:var(--text3);margin-bottom:2px}
+.data-card .d-value{font-size:18px;font-weight:700;color:var(--text)}
+.data-card .d-unit{font-size:11px;color:var(--text3);margin-left:2px}
+.data-card.red::before{background:var(--red)}
+.data-card.orange::before{background:var(--orange)}
+.data-card.blue::before{background:var(--blue)}
+.data-card.green::before{background:var(--green)}
+.data-card.purple::before{background:var(--purple)}
+.data-card.teal::before{background:#00897b}
+.data-card .d-value.red{color:var(--red)}
+.data-card .d-value.orange{color:var(--orange)}
+.data-card .d-value.blue{color:var(--blue)}
+.data-card .d-value.green{color:var(--green)}
+.data-card .d-value.purple{color:var(--purple)}
+.data-card .d-value.teal{color:#00897b}
+
+/* ===== 预设按钮 ===== */
+.presets{
+    display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;
+    padding:6px 0
+}
+.presets .preset-label{
+    font-size:12px;color:var(--text3);display:flex;
+    align-items:center;margin-right:4px;font-weight:500
+}
+.preset-btn{
+    padding:3px 12px;border:1px solid var(--border);border-radius:14px;
+    background:transparent;font-size:11px;color:var(--text2);
+    cursor:pointer;transition:all .2s;font-family:inherit
+}
+.preset-btn:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+.preset-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+@keyframes fadeInUp{
+    from{opacity:0;transform:translateY(6px)}
+    to{opacity:1;transform:translateY(0)}
+}
+.data-card{animation:fadeInUp .3s ease forwards}
+.data-card:nth-child(1){animation-delay:.00s}
+.data-card:nth-child(2){animation-delay:.03s}
+.data-card:nth-child(3){animation-delay:.06s}
+.data-card:nth-child(4){animation-delay:.09s}
+.data-card:nth-child(5){animation-delay:.12s}
+.data-card:nth-child(6){animation-delay:.15s}
+.data-card:nth-child(7){animation-delay:.18s}
+.data-card:nth-child(8){animation-delay:.21s}
+
+@media(max-width:800px){
+    .container{padding:14px;border-radius:12px}
+    .canvas-row{grid-template-columns:1fr;gap:10px}
+    .canvas-box{min-width:unset}
+    input[type=range]{width:68px}
+    .controls{padding:10px}
+    .ctrl-row{gap:3px 10px}
+    .data-dashboard{grid-template-columns:repeat(auto-fit,minmax(100px,1fr))}
+    .data-card .d-value{font-size:15px}
+    .header h1{font-size:18px}
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<div class="header">
+    <h1>⚡ <span>圆盘切割</span>磁感线模型</h1>
+    <button class="theme-toggle" id="themeToggle">🌙 暗色</button>
+</div>
+<div class="subtitle">法拉第电磁感应 · 匀强磁场 · 闭合回路</div>
+
+<div class="canvas-row">
+    <div class="canvas-box">
+        <span class="badge">🔵 物理模型</span>
+        <canvas id="leftCanvas" width="460" height="460"></canvas>
+    </div>
+    <div class="canvas-box">
+        <span class="badge">📈 波形分析</span>
+        <canvas id="rightCanvas" width="520" height="400"></canvas>
+    </div>
+</div>
+
+<!-- 预设场景 -->
+<div class="presets">
+    <span class="preset-label">🎯 预设场景：</span>
+    <button class="preset-btn" data-preset="default">默认</button>
+    <button class="preset-btn" data-preset="highB">强磁场</button>
+    <button class="preset-btn" data-preset="fast">高速旋转</button>
+    <button class="preset-btn" data-preset="largeR">大盘面</button>
+    <button class="preset-btn" data-preset="demo">教学演示</button>
+</div>
+
+<div class="controls">
+    <div class="ctrl-row">
+        <div class="cg">
+            <label>R</label>
+            <input type="range" id="sR" min="0.3" max="2.5" step="0.02" value="1.5">
+            <span class="val" id="dR">1.50</span><span class="unit">m</span>
+        </div>
+        <div class="cg">
+            <label>B</label>
+            <input type="range" id="sB" min="0.1" max="3.0" step="0.02" value="1.0">
+            <span class="val" id="dB">1.00</span><span class="unit">T</span>
+        </div>
+        <div class="cg">
+            <label>ω</label>
+            <input type="range" id="sW" min="0.1" max="5.0" step="0.05" value="1.5">
+            <span class="val" id="dW">1.50</span><span class="unit">rad/s</span>
+        </div>
+        <div class="cg">
+            <label>R<sub>L</sub></label>
+            <input type="range" id="sRL" min="0.5" max="20" step="0.1" value="5.0">
+            <span class="val" id="dRL">5.0</span><span class="unit">Ω</span>
+        </div>
+    </div>
+    <div class="ctrl-row">
+        <button class="btn btn-play" id="btnPlay">⏸ 暂停</button>
+        <span class="kbd-hint">[Space]</span>
+        <button class="btn btn-reset" id="btnReset">⟲ 重置</button>
+        <span class="kbd-hint">[R]</span>
+        <button class="btn btn-reset" id="btnClear">🗑 清空波形</button>
+        <span class="kbd-hint">[C]</span>
+        <div class="cg" style="margin-left:8px">
+            <label>速度</label>
+            <input type="range" id="sSpd" min="0.1" max="3.0" step="0.05" value="1.0">
+            <span class="val" id="dSpd">1.00</span><span class="unit">×</span>
+        </div>
+    </div>
+</div>
+
+<!-- 数据仪表板 -->
+<div class="data-dashboard" id="dataDashboard"></div>
+
+<!-- 公式面板 -->
+<div class="formula-bar" id="formulaBar">
+    <div class="section">
+        <span class="label">ε₀ =</span>
+        <span>½·B·ω·R²</span>
+        <span class="sep">=</span>
+        <span>½ ×</span>
+        <span class="vb" id="fB">1.00</span>
+        <span>×</span>
+        <span class="vg" id="fW">1.50</span>
+        <span>×</span>
+        <span id="fR2">2.25</span>
+        <span class="sep">=</span>
+        <span class="hl" id="fEps">1.688</span><span> V</span>
+    </div>
+    <div class="section">
+        <span class="sep">|</span>
+        <span>I₀ = ε₀/R<sub>L</sub></span>
+        <span class="sep">=</span>
+        <span class="hi" id="fCur">0.338</span><span> A</span>
+    </div>
+    <div class="section">
+        <span class="sep">|</span>
+        <span>P₀ = ε₀·I₀</span>
+        <span class="sep">=</span>
+        <span class="hp" id="fPow">0.570</span><span> W</span>
+    </div>
+</div>
+
+<div class="info-bar" id="infoBar"></div>
+
+</div>
+
+<script>
+// ==================================================================
+//  物理与状态
+// ==================================================================
+const INIT={
+    R:1.5,B:1.0,omega:1.5,R_load:5.0,speed:1.0
+};
+const PRESETS={
+    default:{R:1.5,B:1.0,omega:1.5,R_load:5.0},
+    highB:{R:1.0,B:3.0,omega:1.0,R_load:4.0},
+    fast:{R:1.2,B:0.8,omega:4.0,R_load:6.0},
+    largeR:{R:2.5,B:0.5,omega:0.8,R_load:8.0},
+    demo:{R:2.0,B:1.5,omega:2.0,R_load:3.0}
+};
+const S={
+    R:INIT.R,B:INIT.B,omega:INIT.omega,R_load:INIT.R_load,
+    t:0,playing:true,speed:INIT.speed,numSpokes:12,dt:0.04
+};
+const MAX_PTS=480;
+const tD=[],eD=[],iD=[];
+
+// 图表鼠标游标
+const CS={show:false,idx:-1,t:0,eps:0,cur:0,pwr:0,px:0,py:0};
+
+// 电流流动粒子
+const NUM_FLOW=20;
+let flowPts=[];
+function resetFlow(){
+    flowPts=[];
+    for(let i=0;i<NUM_FLOW;i++)flowPts.push({seg:0,t:i/NUM_FLOW})
+}
+resetFlow();
+
+// ==================================================================
+//  Canvas
+// ==================================================================
+const cL=document.getElementById('leftCanvas');
+const cR=document.getElementById('rightCanvas');
+const L=cL.getContext('2d');
+const Rctx=cR.getContext('2d');
+const LW=cL.width,LH=cL.height,RW=cR.width,RH=cR.height;
+
+function eps0Pure(R,B,omega){return .5*B*omega*R*R}
+function eps0(){return eps0Pure(S.R,S.B,S.omega)}
+function iVal(e){return S.R_load>0?e/S.R_load:0}
+
+// 在 scale(s,-s) 翻转坐标系中绘制正立文字的辅助函数
+function uprightText(ctx, x, y, text) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, -1);
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+}
+
+// ==================================================================
+//  左图：离屏缓存 (静态元素)
+// ==================================================================
+const bc=document.createElement('canvas');
+bc.width=LW;bc.height=LH;const BG=bc.getContext('2d');
+let needBg=!0;
+
+function drawBg(){
+    if(!needBg)return;needBg=!1;
+    const R=S.R,m=R+.8,s=Math.min(LW,LH)/(2*m);
+    BG.clearRect(0,0,LW,LH);BG.save();
+    BG.translate(LW/2,LH/2);BG.scale(s,-s);
+
+    // 网格
+    BG.strokeStyle='rgba(0,0,0,.07)';BG.lineWidth=.02;
+    for(let g=-Math.ceil(m);g<=Math.ceil(m);g++){
+        BG.beginPath();BG.moveTo(g,-m);BG.lineTo(g,m);BG.stroke();
+        BG.beginPath();BG.moveTo(-m,g);BG.lineTo(m,g);BG.stroke()
+    }
+
+    // ⊙ 磁场符号
+    const step=.55;BG.font='.32px sans-serif';
+    BG.textAlign='center';BG.textBaseline='middle';
+    BG.fillStyle='rgba(30,120,220,.28)';
+    for(let x=-m;x<=m;x+=step)for(let y=-m;y<=m;y+=step)
+        if(Math.sqrt(x*x+y*y)<R+.12)BG.fillText('⊙',x,y);
+
+    // 圆盘
+    BG.beginPath();BG.arc(0,0,R,0,Math.PI*2);
+    BG.strokeStyle='#333';BG.lineWidth=.06;BG.stroke();
+    BG.beginPath();BG.arc(0,0,R,0,Math.PI*2);
+    BG.fillStyle='rgba(255,215,0,.13)';BG.fill();
+    BG.beginPath();BG.arc(0,0,.06,0,Math.PI*2);
+    BG.fillStyle='#222';BG.fill();
+
+    // 旋转方向箭头
+    const aR=R*.78,sD=25,eD=115,sR=sD*Math.PI/180,eR=eD*Math.PI/180;
+    BG.beginPath();BG.arc(0,0,aR,sR,eR);
+    BG.strokeStyle='#2e7d32';BG.lineWidth=.045;BG.stroke();
+    const ax=aR*Math.cos(eR),ay=aR*Math.sin(eR);
+    const adx=-aR*Math.sin(eR)*.18,ady=aR*Math.cos(eR)*.18;
+    const hl=.16,aa=Math.atan2(ady,adx);
+    BG.beginPath();BG.moveTo(ax+adx,ay+ady);
+    BG.lineTo(ax+adx-hl*Math.cos(aa-.5),ay+ady-hl*Math.sin(aa-.5));
+    BG.lineTo(ax+adx-hl*Math.cos(aa+.5),ay+ady-hl*Math.sin(aa+.5));
+    BG.closePath();BG.fillStyle='#2e7d32';BG.fill();
+
+    // 外部闭合回路
+    const y0=-R-.55,mX=R*.5,w=R*.40;
+    BG.strokeStyle='#4169E1';BG.lineWidth=.045;BG.lineCap='round';
+    BG.beginPath();BG.moveTo(0,0);BG.lineTo(0,y0);BG.stroke();
+    BG.beginPath();BG.moveTo(0,y0);BG.lineTo(mX-w,y0);BG.stroke();
+    BG.beginPath();BG.moveTo(mX+w,y0);BG.lineTo(R,y0);BG.stroke();
+    BG.beginPath();BG.moveTo(R,y0);BG.lineTo(R,0);BG.stroke();
+
+    // 电阻锯齿
+    const tth=7,seg2=2*w/(2*tth);
+    BG.beginPath();BG.moveTo(mX-w,y0);
+    for(let i=1;i<2*tth;i++){
+        const xi=mX-w+i*seg2,dir=i%2===1?-.10:.10;
+        BG.lineTo(xi,y0+dir)
+    }
+    BG.lineTo(mX+w,y0);
+    BG.strokeStyle='#CC0000';BG.lineWidth=.055;BG.stroke();
+
+    // RL 标签（向下移避免与电阻锯齿重叠）
+    BG.font='.22px sans-serif';
+    BG.textAlign='center';BG.textBaseline='top';
+    BG.fillStyle='#CC0000';
+    uprightText(BG, mX, y0+.28, 'R_L = '+S.R_load.toFixed(1)+' Ω');
+
+    // 电刷
+    const bs=.10;
+    BG.fillStyle='#555';
+    BG.fillRect(-bs,-bs,2*bs,2*bs);
+    BG.font='.18px sans-serif';BG.textAlign='center';BG.textBaseline='top';
+    uprightText(BG, 0, bs+.03, '电刷');
+    BG.fillRect(R-bs,-bs,2*bs,2*bs);
+    BG.textAlign='left';BG.textBaseline='middle';
+    uprightText(BG, R+bs+.04, 0, '电刷');
+
+    // ε 标签
+    BG.font='.22px sans-serif';BG.textAlign='left';BG.textBaseline='middle';
+    BG.fillStyle='#4169E1';
+    uprightText(BG, .08, y0*.5, 'ε → I');
+    BG.font='.24px sans-serif';BG.textAlign='left';BG.textBaseline='top';
+    BG.fillStyle='#1565c0';
+    uprightText(BG, R+.15, R+.05, 'B = '+S.B.toFixed(1)+' T');
+
+    BG.restore()
+}
+
+// ==================================================================
+//  左图：动态元素覆盖
+// ==================================================================
+function drawLeft(){
+    drawBg();
+    L.clearRect(0,0,LW,LH);L.drawImage(bc,0,0);
+    const R=S.R,m=R+.8,s=Math.min(LW,LH)/(2*m);
+    L.save();L.translate(LW/2,LH/2);L.scale(s,-s);
+    const a=S.omega*S.t;
+
+    // 辐条
+    L.strokeStyle='rgba(220,50,50,.55)';L.lineWidth=.030;
+    for(let i=0;i<S.numSpokes;i++){
+        const aa=a+i*Math.PI*2/S.numSpokes;
+        L.beginPath();L.moveTo(0,0);L.lineTo(R*Math.cos(aa),R*Math.sin(aa));L.stroke()
+    }
+
+    // 高亮辐条
+    L.beginPath();L.moveTo(0,0);L.lineTo(R*Math.cos(a),R*Math.sin(a));
+    L.strokeStyle='#FF4500';L.lineWidth=.075;L.stroke();
+
+    // 圆盘呼吸
+    const br=.12+.05*Math.sin(3*a);
+    L.beginPath();L.arc(0,0,R,0,Math.PI*2);
+    L.fillStyle='rgba(255,215,0,'+br+')';L.fill();
+
+    // 标签
+    L.font='.24px sans-serif';L.textAlign='center';L.textBaseline='top';
+    L.fillStyle='#2e7d32';
+    uprightText(L, 0, -R-.15, 'ω = '+S.omega.toFixed(1)+' rad/s');
+    const ec=Eps(),ic=iVal(ec);
+    L.font='.22px sans-serif';L.textAlign='right';L.textBaseline='bottom';
+    L.fillStyle='#b71c1c';
+    uprightText(L, -R-.15, -R-.05, 'ε = '+ec.toFixed(3)+' V');
+    L.textBaseline='top';
+    uprightText(L, -R-.15, -R-.05, 'I = '+ic.toFixed(3)+' A');
+
+    // ================================================================
+    //  电流方向动画：流动粒子 + 脉冲箭头
+    // ================================================================
+    const y0_ = -(R + 0.55);
+    const mX_ = R * 0.5;
+    const w_ = R * 0.40;
+    const path = [
+        {x:0, y:0}, {x:0, y:y0_},
+        {x:mX_-w_, y:y0_}, {x:mX_+w_, y:y0_},
+        {x:R, y:y0_}, {x:R, y:0},
+        {x:0, y:0}
+    ];
+    const numSegs = path.length - 1;
+    const segLens = [];
+    for (let i = 0; i < numSegs; i++) {
+        const dx = path[i+1].x - path[i].x;
+        const dy = path[i+1].y - path[i].y;
+        segLens.push(Math.sqrt(dx*dx + dy*dy));
+    }
+    const curMag = Math.min(1, Math.abs(ic) * 1.5);
+    const flowSpeed = S.dt * S.speed * curMag * 0.25;
+    flowPts.forEach(p => {
+        if (!S.playing || curMag < 0.01) return;
+        p.t += flowSpeed / segLens[p.seg];
+        if (p.t >= 1) { p.t -= 1; p.seg = (p.seg + 1) % numSegs; }
+    });
+    // ── 导线辉光 ──
+    if (curMag > 0.01) {
+        L.strokeStyle = `rgba(255, 100, 0, ${0.06 * curMag})`;
+        L.lineWidth = 0.08; L.lineCap = 'round';
+        L.beginPath();
+        for (let i = 0; i <= numSegs; i++) {
+            i === 0 ? L.moveTo(path[i].x, path[i].y) : L.lineTo(path[i].x, path[i].y);
+        }
+        L.stroke();
+    }
+    // ── 流动粒子 ──
+    flowPts.forEach(p => {
+        const seg = p.seg, nxt = seg + 1;
+        const x = path[seg].x + (path[nxt].x - path[seg].x) * p.t;
+        const y = path[seg].y + (path[nxt].y - path[seg].y) * p.t;
+        const alpha = 0.5 + 0.5 * curMag;
+        const size = 0.035 + 0.025 * curMag;
+        // 外发光
+        L.beginPath(); L.arc(x, y, size * 2.5, 0, Math.PI * 2);
+        L.fillStyle = `rgba(255, 120, 0, ${alpha * 0.12})`;
+        L.fill();
+        // 粒子
+        L.beginPath(); L.arc(x, y, size, 0, Math.PI * 2);
+        L.fillStyle = `rgba(255, ${Math.floor(200-100*curMag)}, 0, ${alpha})`;
+        L.fill();
+    });
+    // ── 动态大箭头（顶部导线）──
+    if (curMag > 0.01) {
+        const ax = mX_ * 0.5;
+        const aSize = 0.10 + 0.03 * (0.7 + 0.3 * Math.sin(S.omega * S.t * 8));
+        const pulseA = 0.6 + 0.4 * curMag;
+        L.save();
+        L.translate(ax, y0_);
+        L.beginPath();
+        L.moveTo(aSize, 0);
+        L.lineTo(-aSize * 0.4, -aSize * 0.4);
+        L.lineTo(-aSize * 0.4, aSize * 0.4);
+        L.closePath();
+        L.fillStyle = `rgba(255, ${Math.floor(180-100*curMag)}, 0, ${pulseA})`;
+        L.fill();
+        L.strokeStyle = `rgba(255, 200, 100, ${pulseA * 0.3})`;
+        L.lineWidth = 0.01;
+        L.stroke();
+        L.restore();
+        // 标签
+        L.font = '.22px sans-serif';
+        L.textAlign = 'center';
+        L.textBaseline = 'bottom';
+        L.fillStyle = `rgba(255, 150, 50, ${pulseA})`;
+        uprightText(L, ax, y0_ - 0.06, 'I →');
+    }
+
+    L.restore()
+}
+
+// ==================================================================
+//  右图：波形 (增强版)
+// ==================================================================
+function drawChart(){
+    Rctx.clearRect(0,0,RW,RH);
+    const pd={top:28,right:20,bottom:38,left:55};
+    const cw=RW-pd.left-pd.right,ch=RH-pd.top-pd.bottom;
+
+    if(tD.length===0){
+        Rctx.fillStyle='#999';Rctx.font='14px sans-serif';
+        Rctx.textAlign='center';Rctx.textBaseline='middle';
+        Rctx.fillText('调节参数开始演示…',pd.left+cw/2,pd.top+ch/2);
+        return
+    }
+
+    const tMax=Math.max(tD[tD.length-1]+2,6);
+    const e0=eps0(),i0=iVal(e0);
+    const yM=Math.max(Math.abs(e0*1.4),Math.abs(i0*1.4),.5);
+    const tx=t=>pd.left+(t/tMax)*cw,ty=v=>pd.top+ch/2-(v/yM)*(ch/2);
+
+    // 背景
+    const isDark=document.body.classList.contains('dark');
+    Rctx.fillStyle=isDark?'#1a1a2e':'#fcfcfd';
+    Rctx.fillRect(pd.left,pd.top,cw,ch);
+    Rctx.strokeStyle=isDark?'#333350':'#ddd';Rctx.lineWidth=.5;
+    Rctx.strokeRect(pd.left,pd.top,cw,ch);
+
+    // 网格
+    Rctx.strokeStyle=isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)';Rctx.lineWidth=.5;
+    for(let g=Math.ceil(-yM);g<=yM;g++){
+        if(Math.abs(g)<.01)continue;
+        const yg=ty(g);Rctx.beginPath();Rctx.moveTo(pd.left,yg);Rctx.lineTo(pd.left+cw,yg);Rctx.stroke()
+    }
+    const xSt=Math.max(1,Math.floor(tMax/6));
+    for(let g=0;g<=tMax;g+=xSt){
+        const xg=tx(g);Rctx.beginPath();Rctx.moveTo(xg,pd.top);Rctx.lineTo(xg,pd.top+ch);Rctx.stroke()
+    }
+    Rctx.strokeStyle=isDark?'#555570':'#bbb';Rctx.lineWidth=1;
+    Rctx.beginPath();Rctx.moveTo(pd.left,ty(0));Rctx.lineTo(pd.left+cw,ty(0));Rctx.stroke();
+
+    // 轴标
+    Rctx.fillStyle=isDark?'#707080':'#888';Rctx.font='11px sans-serif';
+    Rctx.textAlign='center';Rctx.textBaseline='top';
+    for(let g=0;g<=tMax;g+=xSt)Rctx.fillText(g.toFixed(0),tx(g),pd.top+ch+4);
+    Rctx.textAlign='right';Rctx.textBaseline='middle';
+    Rctx.fillText('t (s)',pd.left+cw+2,pd.top+ch+4);
+    Rctx.textAlign='right';Rctx.textBaseline='middle';Rctx.font='10px sans-serif';
+    for(let g=Math.ceil(-yM);g<=yM;g++){
+        if(Math.abs(g)<.01)continue;Rctx.fillText(g.toFixed(1),pd.left-4,ty(g))
+    }
+    Rctx.fillText('0',pd.left-4,ty(0));
+    Rctx.textAlign='left';Rctx.textBaseline='middle';Rctx.fillText('ε / I',pd.left,pd.top-16);
+
+    // 峰值标记
+    if(tD.length>10){
+        let maxE=-Infinity,maxI=-Infinity,minE=Infinity,minI=Infinity;
+        let maxET=0,maxIT=0,minET=0,minIT=0;
+        for(let i=0;i<tD.length;i++){
+            if(eD[i]>maxE){maxE=eD[i];maxET=tD[i]}
+            if(eD[i]<minE&&tD[i]>1){minE=eD[i];minET=tD[i]}
+            if(iD[i]>maxI){maxI=iD[i];maxIT=tD[i]}
+            if(iD[i]<minI&&tD[i]>1){minI=iD[i];minIT=tD[i]}
+        }
+        // 峰值标记仅显示最近的几个
+        const lastT=tD[tD.length-1];
+        const peakMarkers=[
+            {v:maxE,t:maxET,color:'#1565c0',label:'max ε'},
+            {v:maxI,t:maxIT,color:'#E65100',label:'max I'}
+        ];
+        peakMarkers.forEach(p=>{
+            if(lastT-p.t<8&&p.t>0){
+                const px=tx(p.t),py=ty(p.v);
+                Rctx.strokeStyle=p.color;Rctx.lineWidth=1;Rctx.setLineDash([3,3]);
+                Rctx.beginPath();Rctx.moveTo(px,py);Rctx.lineTo(px,pd.top+ch);Rctx.stroke();
+                Rctx.setLineDash([]);
+                Rctx.fillStyle=p.color;Rctx.font='10px sans-serif';
+                Rctx.textAlign='center';Rctx.textBaseline='bottom';
+                Rctx.fillText(p.label+'='+p.v.toFixed(3),px,py-4);
+                Rctx.beginPath();Rctx.arc(px,py,3,0,Math.PI*2);
+                Rctx.fill()
+            }
+        })
+    }
+
+    // 曲线 - ε (实线)
+    if(tD.length>1){
+        Rctx.beginPath();
+        for(let i=0;i<tD.length;i++){
+            const x=tx(tD[i]),y=ty(eD[i]);
+            i===0?Rctx.moveTo(x,y):Rctx.lineTo(x,y)
+        }
+        Rctx.strokeStyle='#1565c0';Rctx.lineWidth=2.5;Rctx.stroke();
+
+        // 曲线填充 (渐变)
+        const grad=Rctx.createLinearGradient(0,pd.top,0,pd.top+ch);
+        grad.addColorStop(0,'rgba(21,101,192,.12)');
+        grad.addColorStop(.5,'rgba(21,101,192,.04)');
+        grad.addColorStop(1,'rgba(21,101,192,.01)');
+        Rctx.beginPath();
+        Rctx.moveTo(tx(tD[0]),pd.top+ch/2);
+        for(let i=0;i<tD.length;i++)Rctx.lineTo(tx(tD[i]),ty(eD[i]));
+        Rctx.lineTo(tx(tD[tD.length-1]),pd.top+ch/2);
+        Rctx.closePath();Rctx.fillStyle=grad;Rctx.fill()
+    }
+
+    // 曲线 - I (虚线)
+    if(tD.length>1){
+        Rctx.beginPath();
+        for(let i=0;i<tD.length;i++){
+            const x=tx(tD[i]),y=ty(iD[i]);
+            i===0?Rctx.moveTo(x,y):Rctx.lineTo(x,y)
+        }
+        Rctx.setLineDash([6,4]);Rctx.strokeStyle='#E65100';Rctx.lineWidth=2.5;
+        Rctx.stroke();Rctx.setLineDash([])
+    }
+
+    // 当前点 (大圆点)
+    const li=tD.length-1;
+    if(li>=0){
+        const px=tx(tD[li]),py=ty(eD[li]),piy=ty(iD[li]);
+        Rctx.beginPath();Rctx.arc(px,py,5,0,Math.PI*2);
+        Rctx.fillStyle='#1565c0';Rctx.fill();
+        Rctx.strokeStyle='#fff';Rctx.lineWidth=2;Rctx.stroke();
+
+        Rctx.beginPath();Rctx.arc(px,piy,4,0,Math.PI*2);
+        Rctx.fillStyle='#E65100';Rctx.fill();
+        Rctx.strokeStyle='#fff';Rctx.lineWidth=1.5;Rctx.stroke()
+    }
+
+    // ---- 十字光标 (鼠标悬停) ----
+    if(CS.show&&CS.idx>=0&&CS.idx<tD.length){
+        const cx=tx(tD[CS.idx]);
+        Rctx.strokeStyle='rgba(0,0,0,.25)';Rctx.lineWidth=1;
+        Rctx.setLineDash([3,4]);
+        Rctx.beginPath();Rctx.moveTo(cx,pd.top);Rctx.lineTo(cx,pd.top+ch);Rctx.stroke();
+        Rctx.setLineDash([]);
+        const cyE=ty(eD[CS.idx]),cyI=ty(iD[CS.idx]);
+        Rctx.beginPath();Rctx.arc(cx,cyE,5,0,Math.PI*2);
+        Rctx.fillStyle='#1565c0';Rctx.fill();
+        Rctx.beginPath();Rctx.arc(cx,cyI,5,0,Math.PI*2);
+        Rctx.fillStyle='#E65100';Rctx.fill();
+        // 信息卡片
+        const txt=[
+            't = '+CS.t.toFixed(2)+' s',
+            'ε = '+CS.eps.toFixed(3)+' V',
+            'I = '+CS.cur.toFixed(3)+' A',
+            'P = '+CS.pwr.toFixed(3)+' W',
+        ];
+        Rctx.font='11px sans-serif';
+        const lh=15,tw=110,th=txt.length*lh+8;
+        let cardX=cx+14,cardY=CS.py-20;
+        if(cardX+tw>pd.left+cw)cardX=cx-tw-14;
+        if(cardY<pd.top)cardY=pd.top+4;
+        if(cardY+th>pd.top+ch)cardY=pd.top+ch-th-4;
+        Rctx.fillStyle=isDark?'rgba(30,30,50,.93)':'rgba(255,255,240,.93)';
+        Rctx.shadowColor='rgba(0,0,0,.10)';Rctx.shadowBlur=6;
+        Rctx.beginPath();Rctx.roundRect(cardX,cardY,tw,th,4);Rctx.fill();
+        Rctx.shadowBlur=0;
+        Rctx.strokeStyle=isDark?'rgba(200,180,80,.3)':'rgba(200,180,80,.4)';Rctx.lineWidth=.5;
+        Rctx.beginPath();Rctx.roundRect(cardX,cardY,tw,th,4);Rctx.stroke();
+        Rctx.textAlign='left';Rctx.textBaseline='top';
+        txt.forEach((l,i)=>{Rctx.fillStyle=isDark?'#f88':'#b71c1c';Rctx.fillText(l,cardX+6,cardY+4+i*lh)})
+    }
+
+    // 图例
+    const lx=pd.left+10,ly=pd.top+8;
+    Rctx.fillStyle=isDark?'rgba(30,30,50,.85)':'rgba(255,255,255,.85)';
+    Rctx.shadowColor='rgba(0,0,0,.04)';Rctx.shadowBlur=4;
+    Rctx.beginPath();Rctx.roundRect(lx,ly,130,44,4);Rctx.fill();
+    Rctx.shadowBlur=0;
+    Rctx.strokeStyle=isDark?'#333350':'#ddd';Rctx.lineWidth=.5;
+    Rctx.beginPath();Rctx.roundRect(lx,ly,130,44,4);Rctx.stroke();
+    Rctx.strokeStyle='#1565c0';Rctx.lineWidth=2.5;
+    Rctx.beginPath();Rctx.moveTo(lx+8,ly+16);Rctx.lineTo(lx+38,ly+16);Rctx.stroke();
+    Rctx.fillStyle=isDark?'#ddd':'#222';Rctx.font='12px sans-serif';Rctx.textAlign='left';Rctx.textBaseline='middle';
+    Rctx.fillText('ε (V)',lx+44,ly+16);
+    Rctx.setLineDash([5,4]);Rctx.strokeStyle='#E65100';Rctx.lineWidth=2;
+    Rctx.beginPath();Rctx.moveTo(lx+8,ly+36);Rctx.lineTo(lx+38,ly+36);Rctx.stroke();Rctx.setLineDash([]);
+    Rctx.fillText('I (A)',lx+44,ly+36);
+
+    // 数据信息框 (右上)
+    const e_=eD[li],i_=iD[li],p_=e_*i_;
+    const ix=pd.left+cw-10,iy=pd.top+6;
+    const ln=['ε₀ = '+e0.toFixed(3)+' V','ε  = '+e_.toFixed(3)+' V','I  = '+i_.toFixed(3)+' A','P  = '+p_.toFixed(3)+' W'];
+    const lh2=16,bw=115,bh=ln.length*lh2+10;
+    Rctx.fillStyle=isDark?'rgba(42,42,30,.90)':'rgba(255,255,230,.90)';
+    Rctx.beginPath();Rctx.roundRect(ix-bw,iy,bw,bh,4);Rctx.fill();
+    Rctx.strokeStyle=isDark?'rgba(200,180,100,.3)':'rgba(200,180,100,.5)';Rctx.lineWidth=.5;
+    Rctx.beginPath();Rctx.roundRect(ix-bw,iy,bw,bh,4);Rctx.stroke();
+    Rctx.textAlign='right';Rctx.textBaseline='top';
+    ln.forEach((l,idx)=>{Rctx.fillStyle=isDark?'#f88':'#b71c1c';Rctx.fillText(l,ix-4,iy+4+idx*lh2)})
+}
+
+// ==================================================================
+//  公式面板 + 信息栏 + 数据仪表板
+// ==================================================================
+function updFormula(){
+    const e=eps0(),i=iVal(e),p=e*i,r2=S.R*S.R;
+    document.getElementById('fB').textContent=S.B.toFixed(2);
+    document.getElementById('fW').textContent=S.omega.toFixed(2);
+    document.getElementById('fR2').textContent=r2.toFixed(3);
+    document.getElementById('fEps').textContent=e.toFixed(3);
+    document.getElementById('fCur').textContent=i.toFixed(3);
+    document.getElementById('fPow').textContent=p.toFixed(3)
+}
+
+function updInfoBar(){
+    const e=eps0(),i=iVal(e),p=e*i;
+    document.getElementById('infoBar').innerHTML=
+        '<span class="l">t</span><span class="v">'+S.t.toFixed(2)+' s</span>'+
+        '<span>|</span>'+
+        '<span class="l">ε₀</span><span class="vr">'+e.toFixed(3)+' V</span>'+
+        '<span class="l">I₀</span><span class="vo">'+i.toFixed(3)+' A</span>'+
+        '<span class="l">P₀</span><span class="vp">'+p.toFixed(3)+' W</span>'+
+        '<span>|</span>'+
+        '<span class="l">R</span><span class="v">'+S.R.toFixed(2)+' m</span>'+
+        '<span class="l">B</span><span class="vb">'+S.B.toFixed(2)+' T</span>'+
+        '<span class="l">ω</span><span class="vg">'+S.omega.toFixed(2)+' rad/s</span>'+
+        '<span class="l">R<sub>L</sub></span><span class="v">'+S.R_load.toFixed(1)+' Ω</span>'
+}
+
+function updDashboard(){
+    const e=eps0(),i=iVal(e),p=e*i,r2=S.R*S.R;
+    const freq=S.omega/(2*Math.PI);
+    const period=1/freq;
+    const e_rms=e/Math.SQRT2;
+    const i_rms=i/Math.SQRT2;
+    const html=`
+        <div class="data-card red">
+            <div class="d-label">感应电动势 ε₀</div>
+            <div class="d-value red">${e.toFixed(3)}</div>
+            <div class="d-unit">V</div>
+        </div>
+        <div class="data-card orange">
+            <div class="d-label">回路电流 I₀</div>
+            <div class="d-value orange">${i.toFixed(3)}</div>
+            <div class="d-unit">A</div>
+        </div>
+        <div class="data-card purple">
+            <div class="d-label">输出功率 P₀</div>
+            <div class="d-value purple">${p.toFixed(3)}</div>
+            <div class="d-unit">W</div>
+        </div>
+        <div class="data-card green">
+            <div class="d-label">旋转频率 f</div>
+            <div class="d-value green">${freq.toFixed(2)}</div>
+            <div class="d-unit">Hz</div>
+        </div>
+        <div class="data-card blue">
+            <div class="d-label">周期 T</div>
+            <div class="d-value blue">${period.toFixed(3)}</div>
+            <div class="d-unit">s</div>
+        </div>
+        <div class="data-card teal">
+            <div class="d-label">ε 有效值 (RMS)</div>
+            <div class="d-value teal">${e_rms.toFixed(3)}</div>
+            <div class="d-unit">V</div>
+        </div>
+        <div class="data-card" style="--c:#00897b">
+            <div class="d-label">I 有效值 (RMS)</div>
+            <div class="d-value teal">${i_rms.toFixed(3)}</div>
+            <div class="d-unit">A</div>
+        </div>
+        <div class="data-card" style="--c:#f57c00">
+            <div class="d-label">角速度 ω</div>
+            <div class="d-value orange">${S.omega.toFixed(2)}</div>
+            <div class="d-unit">rad/s</div>
+        </div>
+    `;
+    document.getElementById('dataDashboard').innerHTML=html
+}
+
+// ==================================================================
+//  Chart 鼠标交互
+// ==================================================================
+cR.addEventListener('mousemove',e=>{
+    const rect=cR.getBoundingClientRect();
+    const mx=((e.clientX-rect.left)/rect.width)*RW;
+    const my=((e.clientY-rect.top)/rect.height)*RH;
+    const pd={top:28,right:20,bottom:38,left:55};
+    const cw=RW-pd.left-pd.right,ch=RH-pd.top-pd.bottom;
+    if(mx<pd.left||mx>pd.left+cw||my<pd.top||my>pd.top+ch){
+        CS.show=!1;return
+    }
+    if(tD.length===0){CS.show=!1;return}
+    const tMax=Math.max(tD[tD.length-1]+2,6);
+    const tVal=(mx-pd.left)/cw*tMax;
+    let best=0,bestD=Infinity;
+    for(let i=0;i<tD.length;i++){
+        const d=Math.abs(tD[i]-tVal);
+        if(d<bestD){bestD=d;best=i}
+    }
+    if(bestD>1){CS.show=!1;return}
+    CS.show=!0;CS.idx=best;
+    CS.t=tD[best];CS.eps=eD[best];CS.cur=iD[best];CS.pwr=eD[best]*iD[best];
+    CS.px=mx;CS.py=my
+});
+cR.addEventListener('mouseleave',()=>{CS.show=!1});
+
+// ==================================================================
+//  动画循环
+// ==================================================================
+let aid=null;
+let frameCount=0;
+function anim(){
+    if(S.playing)S.t+=S.dt*S.speed;
+    const e=Eps(),i=iVal(e);
+    tD.push(S.t);eD.push(e);iD.push(i);
+    if(tD.length>MAX_PTS){tD.shift();eD.shift();iD.shift()}
+    drawLeft();drawChart();updFormula();updInfoBar();
+    // 仅每 3 帧更新仪表板以减少性能开销
+    frameCount++;
+    if(frameCount%3===0)updDashboard();
+    aid=requestAnimationFrame(anim)
+}
+function Eps(){return eps0()*(1+.03*Math.sin(3*S.omega*S.t))}
+
+// ==================================================================
+//  UI 控件
+// ==================================================================
+const sl={
+    R:document.getElementById('sR'),B:document.getElementById('sB'),
+    W:document.getElementById('sW'),RL:document.getElementById('sRL'),
+    Spd:document.getElementById('sSpd')
+};
+const dv={
+    R:document.getElementById('dR'),B:document.getElementById('dB'),
+    W:document.getElementById('dW'),RL:document.getElementById('dRL'),
+    Spd:document.getElementById('dSpd')
+};
+
+function bindSlider(key,slId,setter,fmt){
+    sl[slId].addEventListener('input',function(){
+        const v=parseFloat(this.value);setter(v);
+        dv[key].textContent=fmt(v);
+        if(key!=='Spd'){needBg=!0;tD.length=0;eD.length=0;iD.length=0;S.t=0;resetFlow()}
+    })
+}
+bindSlider('R','R',v=>S.R=v,v=>v.toFixed(2));
+bindSlider('B','B',v=>S.B=v,v=>v.toFixed(2));
+bindSlider('W','W',v=>S.omega=v,v=>v.toFixed(2));
+bindSlider('RL','RL',v=>{S.R_load=v;needBg=!0},v=>v.toFixed(1));
+bindSlider('Spd','Spd',v=>S.speed=v,v=>v.toFixed(2));
+
+// ---- 按钮 + 键盘快捷键 ----
+const btnP=document.getElementById('btnPlay');
+function togglePlay(){
+    S.playing=!S.playing;
+    btnP.textContent=S.playing?'⏸ 暂停':'▶ 播放';
+    btnP.classList.toggle('paused',!S.playing)
+}
+btnP.addEventListener('click',togglePlay);
+
+function resetAll(){
+    S.t=0;S.playing=!0;
+    S.R=INIT.R;S.B=INIT.B;S.omega=INIT.omega;S.R_load=INIT.R_load;S.speed=INIT.speed;
+    sl.R.value=INIT.R;sl.B.value=INIT.B;sl.W.value=INIT.omega;sl.RL.value=INIT.R_load;sl.Spd.value=INIT.speed;
+    dv.R.textContent=INIT.R.toFixed(2);dv.B.textContent=INIT.B.toFixed(2);
+    dv.W.textContent=INIT.omega.toFixed(2);dv.RL.textContent=INIT.R_load.toFixed(1);
+    dv.Spd.textContent=INIT.speed.toFixed(2);
+    tD.length=0;eD.length=0;iD.length=0;needBg=!0;resetFlow();
+    btnP.textContent='⏸ 暂停';btnP.classList.remove('paused');
+    // 高亮默认预设
+    document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('[data-preset="default"]')?.classList.add('active')
+}
+document.getElementById('btnReset').addEventListener('click',resetAll);
+
+document.getElementById('btnClear').addEventListener('click',()=>{
+    tD.length=0;eD.length=0;iD.length=0
+});
+
+// ---- 预设场景 ----
+document.querySelectorAll('.preset-btn').forEach(btn=>{
+    btn.addEventListener('click',function(){
+        const name=this.dataset.preset;
+        const p=PRESETS[name];
+        if(!p)return;
+        // 高亮当前预设
+        document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+        this.classList.add('active');
+        // 应用预设
+        S.R=p.R;S.B=p.B;S.omega=p.omega;S.R_load=p.R_load;S.t=0;
+        sl.R.value=p.R;sl.B.value=p.B;sl.W.value=p.omega;sl.RL.value=p.R_load;
+        dv.R.textContent=p.R.toFixed(2);dv.B.textContent=p.B.toFixed(2);
+        dv.W.textContent=p.omega.toFixed(2);dv.RL.textContent=p.R_load.toFixed(1);
+        tD.length=0;eD.length=0;iD.length=0;needBg=!0;resetFlow();
+        S.playing=!0;
+        btnP.textContent='⏸ 暂停';btnP.classList.remove('paused')
+    })
+});
+// 默认高亮
+document.querySelector('[data-preset="default"]')?.classList.add('active');
+
+// ---- 暗色主题 ----
+const themeBtn=document.getElementById('themeToggle');
+themeBtn.addEventListener('click',()=>{
+    document.body.classList.toggle('dark');
+    themeBtn.textContent=document.body.classList.contains('dark')?'☀️ 亮色':'🌙 暗色'
+});
+
+// 键盘快捷键
+document.addEventListener('keydown',e=>{
+    if(e.key===' '||e.key==='Space'){e.preventDefault();togglePlay()}
+    if(e.key==='r'||e.key==='R')resetAll();
+    if(e.key==='c'||e.key==='C'){tD.length=0;eD.length=0;iD.length=0}
+});
+
+// ==================================================================
+//  启动
+// ==================================================================
+updDashboard();
+anim();updFormula();updInfoBar();
+
+console.log('%c 圆盘切割模型 — 法拉第电磁感应 — 交互增强版 ',
+    'background:#222;color:#ffd700;font-size:15px;padding:5px 10px;border-radius:4px');
+console.log('  快捷键: Space = 暂停/播放  |  R = 重置  |  C = 清空波形');
+console.log('  鼠标悬停图表 = 查看实时数据');
+console.log('  ε₀ = '+eps0().toFixed(3)+' V,  I₀ = '+iVal(eps0()).toFixed(3)+' A');
+</script>
+
+</body>
+</html>
